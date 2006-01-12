@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-01-10 19:56:57 $
- $Revision: 1.1 $
+ $Date: 2006-01-12 16:33:29 $
+ $Revision: 1.2 $
 
  ****************************************************************************/
 
@@ -52,7 +52,7 @@
 #include "irig106ch10.h"
 #include "i106_decode_time.h"
 #include "i106_decode_1553f1.h"
-//#include "i106_decode_tmats.h"
+#include "i106_decode_tmats.h"
 
 
 /*
@@ -69,8 +69,21 @@
 #endif
 
 
-#define MAX_1553_BUSES             16
+#define MAX_1553_BUSES             8
 #define TOTAL_1553_STAT_BUFF_IDX   (0x1000L * MAX_1553_BUSES)
+
+#define CHANTYPE_UNKNOWN        0
+#define CHANTYPE_PCM            1
+#define CHANTYPE_ANALOG         2
+#define CHANTYPE_DISCRETE       3
+#define CHANTYPE_IRIG_TIME      4
+#define CHANTYPE_VIDEO          5
+#define CHANTYPE_UART           6
+#define CHANTYPE_1553           7
+#define CHANTYPE_ARINC_429      8
+#define CHANTYPE_MESSAGE_DATA   9
+#define CHANTYPE_IMAGE DATA    10
+
 
 /*
  * Data structures
@@ -79,10 +92,12 @@
 
 /* These hold the number of messages of each type for the histogram. */
 
+// Message counts
 typedef struct
   {
     unsigned long * pul1553Msgs;
     unsigned long * pul1553Errs;
+    unsigned long   ulErrTimeout;
     unsigned long   ulIrigTime;
     unsigned long   ulTMATS;
     unsigned long   ulMonitor;
@@ -97,21 +112,31 @@ typedef struct
     int             bRT2RTFound;
     } SuCounts;
 
+// Channel ID info
+typedef struct 
+    {
+    unsigned char       uChanType;
+    unsigned char       uChanIdx;
+    } SuChannelDecode;
+
 
 /*
  * Module data
  * -----------
  */
 
+    SuChannelDecode         m_asuChanInfo[0x10000];
 
 /*
  * Function prototypes
  * -------------------
  */
 
-void vResetCounts(SuCounts * psuCnt);
-void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile);
-void vUsage(void);
+void     vResetCounts(SuCounts * psuCnt);
+void     vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile);
+void     vProcessTmats(SuTmatsInfo * psuTmatsInfo);
+unsigned uGet1553ChanID(unsigned uChanIdx);
+void     vUsage(void);
 
 
 /* ------------------------------------------------------------------------ */
@@ -124,15 +149,18 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     FILE                  * ptOutFile;        // Output file handle
     int                     bVerbose;
+    unsigned short          usPackedIdx;
     unsigned long           ulBuffSize = 0L;
     unsigned long           ulReadSize;
+
+    unsigned char           uChanIdx;
 
     int                     iI106Ch10Handle;
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
     Su1553F1_CurrMsg        su1553Msg;
     SuIrigTimeF1            suIrigTime;
-//    SuTmatsInfo             suTmatsInfo;
+    SuTmatsInfo             suTmatsInfo;
 
     unsigned char         * pvBuff = NULL;
 
@@ -223,6 +251,7 @@ int main(int argc, char ** argv)
         return 1;
         }
 
+
 /*
  * Open the output file
  */
@@ -308,84 +337,83 @@ int main(int argc, char ** argv)
             {
 
             case I106CH10_DTYPE_TMATS :         // 0x01
+                suCnt.ulTMATS++;
+
+                // Only decode the first TMATS record
+                if (suCnt.ulTMATS != 0)
+                    {
+                    enI106_Decode_Tmats(&suI106Hdr, pvBuff, ulBuffSize, &suTmatsInfo);
+                    if (enStatus != I106_OK) 
+                        break;
+                    vProcessTmats(&suTmatsInfo);
+                    }
+                break;
 
             case I106CH10_DTYPE_IRIG_TIME :     // 0x11
+                suCnt.ulIrigTime++;
+                break;
+
+            case I106CH10_DTYPE_MPEG2 :         // 0x40
+                suCnt.ulMPEG2++;
+                break;
 
             case I106CH10_DTYPE_1553_FMT_1 :    // 0x19
+
+                uChanIdx = m_asuChanInfo[suI106Hdr.ubyDataType].uChanIdx;
+//              if (m_asuChanInfo[suI106Hdr.ubyDataType].uChanType != CHANTYPE_1553)
+
                 // Step through all 1553 messages
                 enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
                 while (enStatus == I106_OK)
                     {
-                    usPackedMsg = 0;
-                    usPackedMsg |=  ptMonMsg->suStatus.wBusNum    << 11;
-                    usPackedMsg |= (ptMonMsg->wCmdWord1 & 0xF800) >> 5;
-                    usPackedMsg |= (ptMonMsg->wCmdWord1 & 0x0400) >> 5;
-                    usPackedMsg |= (ptMonMsg->wCmdWord1 & 0x03E0) >> 5;
-                    suCnt.pul1553Msgs[usPackedMsg]++;
+
+                    // Update message count
+                    usPackedIdx  = 0;
+                    usPackedIdx |=  uChanIdx                          << 11;
+                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0xF800) >> 5;
+                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x0400) >> 5;
+                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x03E0) >> 5;
+                    suCnt.pul1553Msgs[usPackedIdx]++;
                     suCnt.ulMonitor++;
+
+                    // Update the error counts
+                    if (su1553Msg.psu1553Hdr->bMsgError != 0) 
+                        suCnt.pul1553Errs[usPackedIdx]++;
+
+                    if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
+                        suCnt.ulErrTimeout++;
+
+                    // Get the next 1553 message
                     enStatus = enI106_Decode_Next1553F1(&su1553Msg);
                     }
 /*
-          // Use an intermediate pointer to make things easier to read.
-          ptMonMsg = (SuFfdSummitMonMsg *) pvBuff;
-
           // Pack parameters to make an array index
           if (ptMonMsg->suStatus.wBusNum >= MAX_1553_BUSES) {
             printf("1553 bus number '%d' > Max number of buses supported '%d'",
               ptMonMsg->suStatus.wBusNum, MAX_1553_BUSES);
             break;
             }
-
-          usPackedMsg = 0;
-          usPackedMsg |=  ptMonMsg->suStatus.wBusNum    << 11;
-          usPackedMsg |= (ptMonMsg->wCmdWord1 & 0xF800) >> 5;
-          usPackedMsg |= (ptMonMsg->wCmdWord1 & 0x0400) >> 5;
-          usPackedMsg |= (ptMonMsg->wCmdWord1 & 0x03E0) >> 5;
-          suCnt.pul1553Msgs[usPackedMsg]++;
-
-          // Update the error counts
-          if ((ptMonMsg->suStatus.wErrs   != 0) ||
-              (ptMonMsg->suStatus.bMsgErr != 0))
-            suCnt.pul1553Errs[usPackedMsg]++;
-          if ((ptMonMsg->suStatus.wErrs & 0x01) != 0)
-            suCnt.ulErrManchester++;
-          if ((ptMonMsg->suStatus.wErrs & 0x02) != 0)
-            suCnt.ulErrParity++;
-          if ((ptMonMsg->suStatus.wErrs & 0x04) != 0)
-            suCnt.ulErrOverrun++;
-          if ((ptMonMsg->suStatus.wErrs & 0x08) != 0)
-            suCnt.ulErrTimeout++;
-
-          // If logging RT to RT then do it for second command word
-          if (ptMonMsg->suStatus.bRTRT==1)
-            suCnt.bRT2RTFound = bTRUE;
-            if (suCnt.bLogRT2RT==bTRUE) {
-              usPackedMsg = 0;
-              usPackedMsg |=  ptMonMsg->suStatus.wBusNum    << 11;
-              usPackedMsg |= (ptMonMsg->wCmdWord2 & 0xF800) >> 5;
-              usPackedMsg |= (ptMonMsg->wCmdWord2 & 0x0400) >> 5;
-              usPackedMsg |= (ptMonMsg->wCmdWord2 & 0x03E0) >> 5;
-              suCnt.pul1553Msgs[usPackedMsg]++;
-              } // end if logging RT to RT
-
-          // Update the error counts
-          if ((ptMonMsg->suStatus.wErrs   != 0) ||
-              (ptMonMsg->suStatus.bMsgErr != 0))
-            suCnt.pul1553Errs[usPackedMsg]++;
-          if ((ptMonMsg->suStatus.wErrs & 0x01) != 0)
-            suCnt.ulErrManchester++;
-          if ((ptMonMsg->suStatus.wErrs & 0x02) != 0)
-            suCnt.ulErrParity++;
-          if ((ptMonMsg->suStatus.wErrs & 0x04) != 0)
-            suCnt.ulErrOverrun++;
-          if ((ptMonMsg->suStatus.wErrs & 0x08) != 0)
-            suCnt.ulErrTimeout++;
-
-          break;
 */
 
+                    // If logging RT to RT then do it for second command word
+                    if (su1553Msg.psu1553Hdr->bRT2RT == 1)
+                        suCnt.bRT2RTFound = bTRUE;
+
+                    if (suCnt.bLogRT2RT==bTRUE) 
+                        {
+                        usPackedIdx  = 0;
+                        usPackedIdx |=  uChanIdx                          << 11;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0xF800) >> 5;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x0400) >> 5;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x03E0) >> 5;
+                        suCnt.pul1553Msgs[usPackedIdx]++;
+                    } // end if logging RT to RT
+
+                break;
+
         default:
-          ++suCnt.ulOther;
+            suCnt.ulOther++;
+            break;
         } // end switch on message type
 
     }   /* End while */
@@ -426,13 +454,15 @@ void vResetCounts(SuCounts * psuCnt)
 
   // Clear out the counts
   memset(psuCnt, 0x00, sizeof(SuCounts));
+
   psuCnt->pul1553Msgs = calloc(TOTAL_1553_STAT_BUFF_IDX, sizeof (unsigned long));
-//  memset(psuCnt->pul1553Msgs, 0x00, 0x3FFFL*sizeof (unsigned long));
+  memset(psuCnt->pul1553Msgs, 0x00, 0x3FFFL*sizeof (unsigned long));
+
   psuCnt->pul1553Errs = calloc(TOTAL_1553_STAT_BUFF_IDX, sizeof (unsigned long));
-//  memset(psuCnt->pul1553Errs, 0x00, 0x3FFFL*sizeof (unsigned long));
+  memset(psuCnt->pul1553Errs, 0x00, 0x3FFFL*sizeof (unsigned long));
   
-  assert(psuCnt->pul1553Msgs!=NULL);
-  assert(psuCnt->pul1553Errs!=NULL);
+  assert(psuCnt->pul1553Msgs != NULL);
+  assert(psuCnt->pul1553Errs != NULL);
 
   return;
 }
@@ -442,14 +472,15 @@ void vResetCounts(SuCounts * psuCnt)
 /* ------------------------------------------------------------------------ */
 
 void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
-{
-  long   lMsgIdx;
+    {
+    long        lMsgIdx;
+    unsigned    uChanID;
 
-  fprintf(ptOutFile,"\n=-=-= Message Totals by Type-=-=-=\n\n", psuCnt->ulTotal);
+    fprintf(ptOutFile,"\n=-=-= Message Totals by Type-=-=-=\n\n", psuCnt->ulTotal);
 
-  fprintf(ptOutFile,"File Start %s",  ctime(&(psuCnt->lFileStartTime)));
-  fprintf(ptOutFile,"Data Start %s",  ctime(&(psuCnt->lStartTime)));
-  fprintf(ptOutFile,"Data Stop  %s\n",ctime(&(psuCnt->lStopTime)));
+    fprintf(ptOutFile,"File Start %s",  ctime(&(psuCnt->lFileStartTime)));
+    fprintf(ptOutFile,"Data Start %s",  ctime(&(psuCnt->lStartTime)));
+    fprintf(ptOutFile,"Data Stop  %s\n",ctime(&(psuCnt->lStopTime)));
 
 /*
   if (psuCnt->ulHeader != 0)
@@ -457,63 +488,127 @@ void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
 
   if (psuCnt->ulEvent != 0)
     fprintf(ptOutFile,"Events:           %10lu\n", psuCnt->ulEvent);
-
-  if (psuCnt->ulMonitor != 0) {
-    assert(psuCnt->pul1553Msgs!=NULL);
-    assert(psuCnt->pul1553Errs!=NULL);
-    fprintf(ptOutFile,"SuMMIT Monitor:   %10lu\n", psuCnt->ulMonitor);
-    for (lMsgIdx=0; lMsgIdx<TOTAL_1553_STAT_BUFF_IDX; lMsgIdx++) {
-      if (psuCnt->pul1553Msgs[lMsgIdx] != 0) {
-        fprintf(ptOutFile,"\tBus %d  RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
-          (lMsgIdx >> 11) & 0x0007,
-          (lMsgIdx >>  6) & 0x001f,
-          (lMsgIdx >>  5) & 0x0001 ? 'T' : 'R',
-          (lMsgIdx      ) & 0x001f,
-          psuCnt->pul1553Msgs[lMsgIdx],
-          psuCnt->pul1553Errs[lMsgIdx]);
-        } // end if count not zero
-      } // end for each RT
-
-    fprintf(ptOutFile,"  Manchester Errors :   %10lu\n", psuCnt->ulErrManchester);
-    fprintf(ptOutFile,"  Parity Errors     :   %10lu\n", psuCnt->ulErrParity);
-    fprintf(ptOutFile,"  Overrun Errors    :   %10lu\n", psuCnt->ulErrOverrun);
-    fprintf(ptOutFile,"  Timeout Errors    :   %10lu\n", psuCnt->ulErrTimeout);
-
-    if (psuCnt->bRT2RTFound == bTRUE) {
-      fprintf(ptOutFile,"\n  Warning - RT to RT transfers found in the data\n");
-      if (psuCnt->bLogRT2RT == bTRUE) {
-        fprintf(ptOutFile,"  Message total is NOT the sum of individual RT totals\n");
-        }
-      else {
-        fprintf(ptOutFile,"  Some transmit RTs may not be shown\n");
-        }
-      }
-
-    } // end if 1553 messages
-
-  if (psuCnt->ulGPS_3A != 0)
-    fprintf(ptOutFile,"GPS_3A:           %10lu\n",   psuCnt->ulGPS_3A);
-
-  if (psuCnt->ulGTRI_Serial != 0)
-    fprintf(ptOutFile,"GTRI Serial:      %10lu\n",   psuCnt->ulGTRI_Serial);
-
-  if (psuCnt->ulDiscretes != 0)
-    fprintf(ptOutFile,"Discretes:        %10lu\n",   psuCnt->ulDiscretes);
-
-  if (psuCnt->ulSysLog != 0)
-    fprintf(ptOutFile,"SysLog:           %10lu\n",   psuCnt->ulSysLog);
-
-  if (psuCnt->ulUser != 0)
-    fprintf(ptOutFile,"User:             %10lu\n",   psuCnt->ulUser);
-
-  if (psuCnt->ulUnidentified != 0)
-    fprintf(ptOutFile,"Unidentified:     %10lu\n",   psuCnt->ulUnidentified);
-
-  fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", psuCnt->ulTotal);
 */
 
-  return;
-}
+    if (psuCnt->ulMonitor != 0) 
+        {
+        assert(psuCnt->pul1553Msgs != NULL);
+        assert(psuCnt->pul1553Errs != NULL);
+        fprintf(ptOutFile,"1553 :            %10lu\n", psuCnt->ulMonitor);
+
+        for (lMsgIdx=0; lMsgIdx<TOTAL_1553_STAT_BUFF_IDX; lMsgIdx++) 
+            {
+            if (psuCnt->pul1553Msgs[lMsgIdx] != 0) 
+                {
+                uChanID = uGet1553ChanID((lMsgIdx >> 11) & 0x0007);
+                fprintf(ptOutFile,"    ChanID %d  RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
+                    uChanID,
+                    (lMsgIdx >>  6) & 0x001f,
+                    (lMsgIdx >>  5) & 0x0001 ? 'T' : 'R',
+                    (lMsgIdx      ) & 0x001f,
+                    psuCnt->pul1553Msgs[lMsgIdx],
+                    psuCnt->pul1553Errs[lMsgIdx]);
+                } // end if count not zero
+            } // end for each RT
+
+//      fprintf(ptOutFile,"  Manchester Errors :   %10lu\n", psuCnt->ulErrManchester);
+//      fprintf(ptOutFile,"  Parity Errors     :   %10lu\n", psuCnt->ulErrParity);
+//      fprintf(ptOutFile,"  Overrun Errors    :   %10lu\n", psuCnt->ulErrOverrun);
+        fprintf(ptOutFile,"    Timeout Errors    :   %10lu\n", psuCnt->ulErrTimeout);
+
+        if (psuCnt->bRT2RTFound == bTRUE) 
+            {
+            fprintf(ptOutFile,"\n  Warning - RT to RT transfers found in the data\n");
+            if (psuCnt->bLogRT2RT == bTRUE)
+                fprintf(ptOutFile,"  Message total is NOT the sum of individual RT totals\n");
+            else 
+                fprintf(ptOutFile,"  Some transmit RTs may not be shown\n");
+            } // end if RT to RT
+
+        } // end if 1553 messages
+
+    if (psuCnt->ulIrigTime != 0)
+        fprintf(ptOutFile,"IRIG Time         %10lu\n",   psuCnt->ulIrigTime);
+
+    if (psuCnt->ulMPEG2 != 0)
+        fprintf(ptOutFile,"MPEG Video        %10lu\n",   psuCnt->ulMPEG2);
+
+    if (psuCnt->ulTMATS != 0)
+        fprintf(ptOutFile,"TMATS             %10lu\n",   psuCnt->ulTMATS);
+
+    if (psuCnt->ulOther != 0)
+        fprintf(ptOutFile,"Other messages    %10lu\n",   psuCnt->ulOther);
+
+    fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", psuCnt->ulTotal);
+
+    return;
+    }
+
+
+
+
+/* ------------------------------------------------------------------------ */
+
+
+void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
+    {
+    unsigned            uArrayIdx;
+    unsigned char       u1553ChanIdx;
+    SuRRecord         * psuRRecord;
+    SuRDataSource     * psuRDataSrc;
+
+    // Initialize the message mapping array
+    for (uArrayIdx=0; uArrayIdx<0x10000; uArrayIdx++)
+        {
+        m_asuChanInfo[uArrayIdx].uChanType = CHANTYPE_UNKNOWN;
+        m_asuChanInfo[uArrayIdx].uChanIdx  = 0;
+        }
+
+    // Map IRIG106 messages and channels
+    u1553ChanIdx = 0;
+    psuRRecord   = psuTmatsInfo->psuFirstRRecord;
+    while (psuRRecord != NULL)
+        {
+        // Get the first data source for this R record
+        psuRDataSrc = psuRRecord->psuFirstDataSource;
+        while (psuRDataSrc != NULL)
+            {
+            // See if 1553 channel data type
+            if (stricmp(psuRDataSrc->szChannelDataType,"1553IN") == 0)
+                {
+                m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanType = CHANTYPE_1553;
+                m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanIdx  = u1553ChanIdx++;
+                } // end if 1553 channel type
+
+            // Get the next R record data source
+            psuRDataSrc = psuRDataSrc->psuNextRDataSource;
+            } // end while walking R data source linked list
+
+        // Get the next R record
+        psuRRecord = psuRRecord->psuNextRRecord;
+
+        } // end while walking R record linked list
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+unsigned uGet1553ChanID(unsigned uChanIdx)
+    {
+    unsigned    uChanID;
+
+    for (uChanID=0; uChanID <0x10000; uChanID++)
+        {
+        if ((m_asuChanInfo[uChanID].uChanType == CHANTYPE_1553) &&
+            (m_asuChanInfo[uChanID].uChanIdx  == uChanIdx))
+            break;
+        } // end for all channel id's
+
+    return uChanID;
+    }
 
 
 
