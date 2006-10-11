@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-01-12 16:33:29 $
- $Revision: 1.2 $
+ $Date: 2006-10-11 02:44:05 $
+ $Revision: 1.3 $
 
  ****************************************************************************/
 
@@ -50,6 +50,7 @@
 #include "stdint.h"
 
 #include "irig106ch10.h"
+#include "i106_time.h"
 #include "i106_decode_time.h"
 #include "i106_decode_1553f1.h"
 #include "i106_decode_tmats.h"
@@ -159,7 +160,7 @@ int main(int argc, char ** argv)
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
     Su1553F1_CurrMsg        su1553Msg;
-    SuIrigTimeF1            suIrigTime;
+    SuIrig106Time           suIrigTime;
     SuTmatsInfo             suTmatsInfo;
 
     unsigned char         * pvBuff = NULL;
@@ -292,15 +293,15 @@ int main(int argc, char ** argv)
             }
 
         // Make sure our buffer is big enough, size *does* matter
-        if (ulBuffSize < suI106Hdr.ulDataLen)
+        if (ulBuffSize < suI106Hdr.ulDataLen+8)
             {
-            pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen);
-            ulBuffSize = suI106Hdr.ulDataLen;
+            pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
+            ulBuffSize = suI106Hdr.ulDataLen+8;
             }
 
-        // Read the next data buffer
+        // Read the data buffer
         ulReadSize = ulBuffSize;
-        enStatus = enI106Ch10ReadNextData(iI106Ch10Handle, &ulBuffSize, pvBuff);
+        enStatus = enI106Ch10ReadData(iI106Ch10Handle, &ulBuffSize, pvBuff);
         if (enStatus != I106_OK)
             {
             printf(" Error reading header : Status = %d\n", enStatus);
@@ -315,7 +316,7 @@ int main(int argc, char ** argv)
             {
 
             // Convert relative time to clock time
-            enI106_Rel2IrigTime(suI106Hdr.aubyRefTime, &suIrigTime);
+            enI106_Rel2IrigTime(iI106Ch10Handle, suI106Hdr.aubyRefTime, &suIrigTime);
 
             // Only calculate file start time from time message
             if (suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME)
