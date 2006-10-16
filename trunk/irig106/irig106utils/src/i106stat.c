@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-10-11 02:44:05 $
- $Revision: 1.3 $
+ $Date: 2006-10-16 00:43:41 $
+ $Revision: 1.4 $
 
  ****************************************************************************/
 
@@ -109,6 +109,8 @@ typedef struct
     long            lFileStartTime;
     long            lStartTime;
     long            lStopTime;
+    uint64_t        llStartTime;
+    uint64_t        llStopTime;
     int             bLogRT2RT;
     int             bRT2RTFound;
     } SuCounts;
@@ -328,8 +330,16 @@ int main(int argc, char ** argv)
             // Anything else is a data packet
             else
                 {
-                if (suCnt.lStartTime == 0L) suCnt.lStartTime = suIrigTime.ulSecs;
-                else                        suCnt.lStopTime  = suIrigTime.ulSecs;
+                if (suCnt.lStartTime == 0L) 
+                    {
+                    suCnt.lStartTime = suIrigTime.ulSecs;
+                    memcpy(&suCnt.llStartTime, &suI106Hdr.aubyRefTime[0], 6);
+                    }
+                else
+                    {
+                    suCnt.lStopTime  = suIrigTime.ulSecs;
+                    memcpy(&suCnt.llStopTime, &suI106Hdr.aubyRefTime[0], 6);
+                    }
                 }
             } // end if not TMATS
 
@@ -343,7 +353,7 @@ int main(int argc, char ** argv)
                 // Only decode the first TMATS record
                 if (suCnt.ulTMATS != 0)
                     {
-                    enI106_Decode_Tmats(&suI106Hdr, pvBuff, ulBuffSize, &suTmatsInfo);
+                    enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
                     if (enStatus != I106_OK) 
                         break;
                     vProcessTmats(&suTmatsInfo);
@@ -476,12 +486,23 @@ void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
     {
     long        lMsgIdx;
     unsigned    uChanID;
+    struct tm * psuTmTime;
+    char        szTime[50];
+    char      * szTimeFmt = "%m/%d/%Y %H:%M:%S";
 
     fprintf(ptOutFile,"\n=-=-= Message Totals by Type-=-=-=\n\n", psuCnt->ulTotal);
 
-    fprintf(ptOutFile,"File Start %s",  ctime(&(psuCnt->lFileStartTime)));
-    fprintf(ptOutFile,"Data Start %s",  ctime(&(psuCnt->lStartTime)));
-    fprintf(ptOutFile,"Data Stop  %s\n",ctime(&(psuCnt->lStopTime)));
+    psuTmTime = gmtime(&(psuCnt->lFileStartTime));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"File Start %s\n",  szTime);
+
+    psuTmTime = gmtime(&(psuCnt->lStartTime));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Start %s (%ld)\n",  szTime, psuCnt->llStartTime);
+
+    psuTmTime = gmtime(&(psuCnt->lStopTime));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Stop  %s (%ld)\n\n",  szTime, psuCnt->llStopTime);
 
 /*
   if (psuCnt->ulHeader != 0)
