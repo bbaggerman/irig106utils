@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmptmat.c,v $
- $Date: 2006-10-11 02:45:57 $
- $Revision: 1.1 $
+ $Date: 2006-10-16 00:41:45 $
+ $Revision: 1.2 $
 
  ****************************************************************************/
 
@@ -91,7 +91,10 @@ typedef struct
  * -------------------
  */
 
-void     vUsage(void);
+void    vDumpRaw(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile);
+void    vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile);
+void    vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile);
+void    vUsage(void);
 
 
 /* ------------------------------------------------------------------------ */
@@ -104,6 +107,8 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     FILE                  * ptOutFile;        // Output file handle
     int                     bRawOutput;
+    int                     bTreeOutput;
+    int                     bChannelOutput;
     unsigned long           ulBuffSize = 0L;
     unsigned long           ulReadSize;
 
@@ -113,13 +118,6 @@ int main(int argc, char ** argv)
 
     unsigned char         * pvBuff = NULL;
 
-    int                     iGIndex;
-    int                     iRIndex;
-    int                     iRDsiIndex;
-    SuTmatsInfo             suTmatsInfo;
-    SuGDataSource         * psuGDataSource;
-    SuRRecord             * psuRRecord;
-    SuRDataSource         * psuRDataSource;
 
 /* Make sure things stay on UTC */
 
@@ -135,8 +133,10 @@ int main(int argc, char ** argv)
     return 1;
     }
 
-    bRawOutput   = bFALSE;               // No verbosity
-    szInFile[0]  = '\0';
+    bRawOutput     = bFALSE;               // No verbosity
+    bTreeOutput    = bFALSE;
+    bChannelOutput = bFALSE;
+    szInFile[0]    = '\0';
     strcpy(szOutFile,"con");             // Default is stdout
 
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
@@ -152,6 +152,14 @@ int main(int argc, char ** argv)
 
                     case 'r' :                   // Raw output
                         bRawOutput = bTRUE;
+                        break;
+
+                    case 't' :                   // Tree output
+                        bTreeOutput = bTRUE;
+                        break;
+
+                    case 'c' :                   // Channel summary
+                        bChannelOutput = bTRUE;
                         break;
 
                     default :
@@ -173,6 +181,12 @@ int main(int argc, char ** argv)
         vUsage();
         return 1;
         }
+
+    // Make sure at least on output is turned on
+    if ((bRawOutput     == bFALSE) &&
+        (bTreeOutput    == bFALSE) &&
+        (bChannelOutput == bFALSE))
+        bChannelOutput = bTRUE;
 
 /*
  * Open file and get everything init'ed
@@ -202,10 +216,6 @@ int main(int argc, char ** argv)
         printf("Error opening output file\n");
         return 1;
         }
-
-
-//  printf("Computing histogram...\n");
-
 
     // Read the next header
     enStatus = enI106Ch10ReadNextHeader(iI106Ch10Handle, &suI106Hdr);
@@ -238,20 +248,71 @@ int main(int argc, char ** argv)
         return 1;
         }
 
+    // Generate output
+    printf("IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION"\n");
+    printf("TMATS from file %s\n\n", szInFile);
+
+    if (bRawOutput == bTRUE)
+        vDumpRaw(&suI106Hdr, pvBuff, ptOutFile);
+
+    if (bTreeOutput == bTRUE)
+        vDumpTree(&suI106Hdr, pvBuff, ptOutFile);
+
+    if (bChannelOutput == bTRUE)
+        vDumpChannel(&suI106Hdr, pvBuff, ptOutFile);
+
+    // Done so clean up
+    free(pvBuff);
+    pvBuff = NULL;
+
+    fclose(ptOutFile);
+
+    return 0;
+    }
+
+
+/* ------------------------------------------------------------------------ */
+
+// Output the raw, unformated TMATS record
+
+void  vDumpRaw(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
+    {
+    unsigned long    lChrIdx;
+    char           * achBuff = pvBuff;
+
+    for (lChrIdx = 0; lChrIdx<psuI106Hdr->ulDataLen; lChrIdx++)
+        fputc(achBuff[lChrIdx], ptOutFile);
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
+    {
+    EnI106Status            enStatus;
+    int                     iGIndex;
+    int                     iRIndex;
+    int                     iRDsiIndex;
+    SuTmatsInfo             suTmatsInfo;
+    SuGDataSource         * psuGDataSource;
+    SuRRecord             * psuRRecord;
+    SuRDataSource         * psuRDataSource;
+
     // Process the TMATS info
-    enI106_Decode_Tmats(&suI106Hdr, pvBuff, ulBuffSize, &suTmatsInfo);
+    enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
     if (enStatus != I106_OK) 
         {
         printf(" Error processing TMATS record : Status = %d\n", enStatus);
-        return 1;
+        return;
         }
 
     // Print out the TMATS info
     // ------------------------
 
     // G record
-    printf("IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION"\n");
-    printf("TMATS from file %s\n\n", szInFile);
     printf("(G) Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
     printf("(G) IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
 
@@ -302,22 +363,89 @@ int main(int argc, char ** argv)
     printf(" - %s",suTmatsInfo);
 */
 
-    // Done so clean up
-    free(pvBuff);
-    pvBuff = NULL;
 
-    fclose(ptOutFile);
-
-    return 0;
+    return;
     }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
+    {
+    EnI106Status            enStatus;
+    int                     iGIndex;
+    int                     iRIndex;
+    int                     iRDsiIndex;
+    SuTmatsInfo             suTmatsInfo;
+    SuGDataSource         * psuGDataSource;
+    SuRRecord             * psuRRecord;
+    SuRDataSource         * psuRDataSource;
+
+    // Process the TMATS info
+    enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
+    if (enStatus != I106_OK) 
+        {
+        printf(" Error processing TMATS record : Status = %d\n", enStatus);
+        return;
+        }
+
+    // Print out the TMATS info
+    // ------------------------
+
+    // G record
+    printf("Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
+    printf("IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
+    printf("Channel  Type          Data Source         \n");
+    printf("-------  ------------  --------------------\n");
+
+    // Data sources
+    psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource;
+    do  {
+        if (psuGDataSource == NULL) break;
+
+        // G record data source info
+        iGIndex = psuGDataSource->iDataSourceNum;
+
+        // R record info
+        psuRRecord = psuGDataSource->psuRRecord;
+        do  {
+            if (psuRRecord == NULL) break;
+            iRIndex = psuRRecord->iRecordNum;
+
+            // R record data sources
+            psuRDataSource = psuRRecord->psuFirstDataSource;
+            do  {
+                if (psuRDataSource == NULL) break;
+                iRDsiIndex = psuRDataSource->iDataSourceNum;
+                printf(" %5i ",   psuRDataSource->iTrackNumber);
+                printf("  %-12s", psuRDataSource->szChannelDataType);
+                printf("  %-20s", psuRDataSource->szDataSourceID);
+                printf("\n");
+                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                } while (bTRUE);
+
+            psuRRecord = psuRRecord->psuNextRRecord;
+            } while (bTRUE);
+
+
+        psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        } while (bTRUE);
+
+    return;
+    }
+
 
 
 /* ------------------------------------------------------------------------ */
 
 void vUsage(void)
   {
-  printf("IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+  printf("irig106.org - IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+  printf("Read and output TMATS record from a Ch 10 data file\n");
   printf("Usage: idmptmat <infile> <outfile> <flags>\n");
+  printf("  -c      Output channel summary format (default)\n");
+  printf("  -t      Output tree view format\n");
   printf("  -r      Output raw TMATS\n");
   return;
   }
