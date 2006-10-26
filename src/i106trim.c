@@ -37,8 +37,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106trim.c,v $
- $Date: 2006-07-29 12:46:07 $
- $Revision: 1.2 $
+ $Date: 2006-10-26 11:17:15 $
+ $Revision: 1.3 $
 
   ==========================================================================*/
 
@@ -50,6 +50,7 @@
 #include "stdint.h"
 
 #include "irig106ch10.h"
+#include "i106_time.h"
 #include "i106_decode_time.h"
 
 /*
@@ -97,18 +98,19 @@ void vUsage(void);
 
 int main (int argc, char *argv[])
     {
+    int              iI106Ch10Handle;
     int              iI106_In;    // Input data file handle
     int              iI106_Out;   // Output data file handle
-    unsigned long   ulIrigTime;
+    unsigned long    ulIrigTime;
 
-
+    EnI106Status     enStatus;
 
     unsigned short   usMsgType;
-    SuFfdrTime       tTime;
+    SuIrig106Time    suTime;
     unsigned short   usBuffSize;
     void *           pvBuff = NULL;
 
-    struct tm       *ptPCDateTime;
+    struct tm      * ptPCDateTime;
 
     int              iArgIdx;
     int              iInHour;
@@ -126,8 +128,8 @@ int main (int argc, char *argv[])
 
 
     // Make sure things stay on UTC
-    putenv("TZ=GMT0");
-    tzset();
+//    putenv("TZ=GMT0");
+//    tzset();
 
 /*
  * Process the command line arguments
