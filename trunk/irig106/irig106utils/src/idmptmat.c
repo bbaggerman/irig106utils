@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmptmat.c,v $
- $Date: 2006-10-16 00:41:45 $
- $Revision: 1.2 $
+ $Date: 2006-11-20 04:34:21 $
+ $Revision: 1.3 $
 
  ****************************************************************************/
 
@@ -50,9 +50,6 @@
 #include "stdint.h"
 
 #include "irig106ch10.h"
-//#include "i106_time.h"
-//#include "i106_decode_time.h"
-//#include "i106_decode_1553f1.h"
 #include "i106_decode_tmats.h"
 
 
@@ -70,21 +67,11 @@
 #endif
 
 
-// Channel ID info
-/*
-typedef struct 
-    {
-    unsigned char       uChanType;
-    unsigned char       uChanIdx;
-    } SuChannelDecode;
-*/
-
 /*
  * Module data
  * -----------
  */
 
-//    SuChannelDecode         m_asuChanInfo[0x10000];
 
 /*
  * Function prototypes
@@ -110,7 +97,6 @@ int main(int argc, char ** argv)
     int                     bTreeOutput;
     int                     bChannelOutput;
     unsigned long           ulBuffSize = 0L;
-    unsigned long           ulReadSize;
 
     int                     iI106Ch10Handle;
     EnI106Status            enStatus;
@@ -133,11 +119,11 @@ int main(int argc, char ** argv)
     return 1;
     }
 
-    bRawOutput     = bFALSE;               // No verbosity
+    bRawOutput     = bFALSE;    // No verbosity
     bTreeOutput    = bFALSE;
     bChannelOutput = bFALSE;
     szInFile[0]    = '\0';
-    strcpy(szOutFile,"con");             // Default is stdout
+    strcpy(szOutFile,"");       // Default is stdout
 
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
         {
@@ -164,7 +150,7 @@ int main(int argc, char ** argv)
 
                     default :
                         break;
-                    } /* end flag switch */
+                    } // end flag switch
                 break;
 
             // Anything else must be a file name
@@ -173,10 +159,10 @@ int main(int argc, char ** argv)
                 else                     strcpy(szOutFile,argv[iArgIdx]);
                 break;
 
-            } /* end command line arg switch */
-        } /* end for all arguments */
+            } // end command line arg switch
+        } // end for all arguments
 
-    if ((strlen(szInFile)==0) || (strlen(szOutFile)==0)) 
+    if (strlen(szInFile)==0) 
         {
         vUsage();
         return 1;
@@ -201,7 +187,7 @@ int main(int argc, char ** argv)
     enStatus = enI106Ch10Open(&iI106Ch10Handle, szInFile, I106_READ);
     if (enStatus != I106_OK)
         {
-        printf("Error opening data file : Status = %d\n", enStatus);
+        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
         return 1;
         }
 
@@ -210,19 +196,34 @@ int main(int argc, char ** argv)
  * Open the output file
  */
 
-    ptOutFile = fopen(szOutFile,"w");
-    if (ptOutFile == NULL) 
+
+    // If output file specified then open it    
+    if (strlen(szOutFile) != 0)
         {
-        printf("Error opening output file\n");
-        return 1;
+        ptOutFile = fopen(szOutFile,"w");
+        if (ptOutFile == NULL) 
+            {
+            fprintf(stderr, "Error opening output file\n");
+            return 1;
+            }
         }
+
+    // No output file name so use stdout
+    else
+        {
+        ptOutFile = stdout;
+        }
+
+/*
+ * Read the TMATS record
+ */
 
     // Read the next header
     enStatus = enI106Ch10ReadNextHeader(iI106Ch10Handle, &suI106Hdr);
 
     if (enStatus != I106_OK)
         {
-        printf(" Error reading header : Status = %d\n", enStatus);
+        fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
         return 1;
         }
 
@@ -234,23 +235,22 @@ int main(int argc, char ** argv)
         }
 
     // Read the data buffer
-    ulReadSize = ulBuffSize;
-    enStatus = enI106Ch10ReadData(iI106Ch10Handle, &ulBuffSize, pvBuff);
+    enStatus = enI106Ch10ReadData(iI106Ch10Handle, ulBuffSize, pvBuff);
     if (enStatus != I106_OK)
         {
-        printf(" Error reading data : Status = %d\n", enStatus);
+        fprintf(stderr, " Error reading data : Status = %d\n", enStatus);
         return 1;
         }
 
     if (suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS)
         {
-        printf(" Error reading data : first message not TMATS");
+        fprintf(stderr, " Error reading data : first message not TMATS");
         return 1;
         }
 
     // Generate output
-    printf("IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION"\n");
-    printf("TMATS from file %s\n\n", szInFile);
+    fprintf(ptOutFile, "IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION"\n");
+    fprintf(ptOutFile, "TMATS from file %s\n\n", szInFile);
 
     if (bRawOutput == bTRUE)
         vDumpRaw(&suI106Hdr, pvBuff, ptOutFile);
@@ -305,7 +305,7 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
     enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
     if (enStatus != I106_OK) 
         {
-        printf(" Error processing TMATS record : Status = %d\n", enStatus);
+        fprintf(stderr, " Error processing TMATS record : Status = %d\n", enStatus);
         return;
         }
 
@@ -313,8 +313,8 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
     // ------------------------
 
     // G record
-    printf("(G) Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
-    printf("(G) IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
+    fprintf(ptOutFile, "(G) Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
+    fprintf(ptOutFile, "(G) IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
 
     // Data sources
     psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource;
@@ -323,10 +323,10 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
 
         // G record data source info
         iGIndex = psuGDataSource->iDataSourceNum;
-        printf("  (G\\DSI-%i) Data Source ID   - %s\n",
+        fprintf(ptOutFile, "  (G\\DSI-%i) Data Source ID   - %s\n",
             psuGDataSource->iDataSourceNum,
             suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->szDataSourceID);
-        printf("  (G\\DST-%i) Data Source Type - %s\n",
+        fprintf(ptOutFile, "  (G\\DST-%i) Data Source Type - %s\n",
             psuGDataSource->iDataSourceNum,
             suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->szDataSourceType);
 
@@ -335,7 +335,7 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
         do  {
             if (psuRRecord == NULL) break;
             iRIndex = psuRRecord->iRecordNum;
-            printf("    (R-%i\\ID) Data Source ID - %s\n",
+            fprintf(ptOutFile, "    (R-%i\\ID) Data Source ID - %s\n",
                 iRIndex, psuRRecord->szDataSourceID);
 
             // R record data sources
@@ -343,9 +343,9 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
             do  {
                 if (psuRDataSource == NULL) break;
                 iRDsiIndex = psuRDataSource->iDataSourceNum;
-                printf("      (R-%i\\DSI-%i) Data Source ID - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szDataSourceID);
-                printf("      (R-%i\\DST-%i) Channel Type   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szChannelDataType);
-                printf("      (R-%i\\TK1-%i) Track Number   - %i\n", iRIndex, iRDsiIndex, psuRDataSource->iTrackNumber);
+                fprintf(ptOutFile, "      (R-%i\\DSI-%i) Data Source ID - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szDataSourceID);
+                fprintf(ptOutFile, "      (R-%i\\DST-%i) Channel Type   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szChannelDataType);
+                fprintf(ptOutFile, "      (R-%i\\TK1-%i) Track Number   - %i\n", iRIndex, iRDsiIndex, psuRDataSource->iTrackNumber);
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 
@@ -355,13 +355,6 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
 
         psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
         } while (bTRUE);
-
-/*
-    printf(" - %s",suTmatsInfo);
-    printf(" - %s",suTmatsInfo);
-    printf(" - %s",suTmatsInfo);
-    printf(" - %s",suTmatsInfo);
-*/
 
 
     return;
@@ -386,7 +379,7 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
     enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
     if (enStatus != I106_OK) 
         {
-        printf(" Error processing TMATS record : Status = %d\n", enStatus);
+        fprintf(stderr, " Error processing TMATS record : Status = %d\n", enStatus);
         return;
         }
 
@@ -394,10 +387,10 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
     // ------------------------
 
     // G record
-    printf("Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
-    printf("IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
-    printf("Channel  Type          Data Source         \n");
-    printf("-------  ------------  --------------------\n");
+    fprintf(ptOutFile, "Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
+    fprintf(ptOutFile, "IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
+    fprintf(ptOutFile, "Channel  Type          Data Source         \n");
+    fprintf(ptOutFile, "-------  ------------  --------------------\n");
 
     // Data sources
     psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource;
@@ -418,10 +411,10 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
             do  {
                 if (psuRDataSource == NULL) break;
                 iRDsiIndex = psuRDataSource->iDataSourceNum;
-                printf(" %5i ",   psuRDataSource->iTrackNumber);
-                printf("  %-12s", psuRDataSource->szChannelDataType);
-                printf("  %-20s", psuRDataSource->szDataSourceID);
-                printf("\n");
+                fprintf(ptOutFile, " %5i ",   psuRDataSource->iTrackNumber);
+                fprintf(ptOutFile, "  %-12s", psuRDataSource->szChannelDataType);
+                fprintf(ptOutFile, "  %-20s", psuRDataSource->szDataSourceID);
+                fprintf(ptOutFile, "\n");
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 
