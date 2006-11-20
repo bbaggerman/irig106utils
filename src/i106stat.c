@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-10-16 00:43:41 $
- $Revision: 1.4 $
+ $Date: 2006-11-20 04:34:21 $
+ $Revision: 1.5 $
 
  ****************************************************************************/
 
@@ -47,9 +47,10 @@
 #include <time.h>
 #include <assert.h>
 
+#include "config.h"
 #include "stdint.h"
-
 #include "irig106ch10.h"
+
 #include "i106_time.h"
 #include "i106_decode_time.h"
 #include "i106_decode_1553f1.h"
@@ -109,8 +110,9 @@ typedef struct
     long            lFileStartTime;
     long            lStartTime;
     long            lStopTime;
-    uint64_t        llStartTime;
-    uint64_t        llStopTime;
+    unsigned char   abyFileStartTime[6];
+    unsigned char   abyStartTime[6];
+    unsigned char   abyStopTime[6];
     int             bLogRT2RT;
     int             bRT2RTFound;
     } SuCounts;
@@ -128,7 +130,8 @@ typedef struct
  * -----------
  */
 
-    SuChannelDecode         m_asuChanInfo[0x10000];
+int                     m_iI106Handle;
+SuChannelDecode         m_asuChanInfo[0x10000];
 
 /*
  * Function prototypes
@@ -137,6 +140,7 @@ typedef struct
 
 void     vResetCounts(SuCounts * psuCnt);
 void     vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile);
+void     vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
 void     vProcessTmats(SuTmatsInfo * psuTmatsInfo);
 unsigned uGet1553ChanID(unsigned uChanIdx);
 void     vUsage(void);
@@ -152,17 +156,18 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     FILE                  * ptOutFile;        // Output file handle
     int                     bVerbose;
+    int                     bFoundFileStartTime = bFALSE;
+    int                     bFoundDataStartTime = bFALSE;
     unsigned short          usPackedIdx;
     unsigned long           ulBuffSize = 0L;
     unsigned long           ulReadSize;
 
     unsigned char           uChanIdx;
 
-    int                     iI106Ch10Handle;
+//    SuIrig106Time           suIrigTime;
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
     Su1553F1_CurrMsg        su1553Msg;
-    SuIrig106Time           suIrigTime;
     SuTmatsInfo             suTmatsInfo;
 
     unsigned char         * pvBuff = NULL;
@@ -196,7 +201,7 @@ int main(int argc, char ** argv)
     suCnt.bLogRT2RT   = bFALSE;               // Don't keep track of RT to RT
     suCnt.bRT2RTFound = bFALSE;
     szInFile[0]  = '\0';
-    strcpy(szOutFile,"con");             // Default is stdout
+    strcpy(szOutFile,"");                     // Default is stdout
 
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
         {
@@ -231,7 +236,7 @@ int main(int argc, char ** argv)
             } /* end command line arg switch */
         } /* end for all arguments */
 
-    if ((strlen(szInFile)==0) || (strlen(szOutFile)==0)) 
+    if (strlen(szInFile)==0) 
         {
         vUsage();
         return 1;
@@ -247,23 +252,39 @@ int main(int argc, char ** argv)
  *  Open file and allocate a buffer for reading data.
  */
 
-    enStatus = enI106Ch10Open(&iI106Ch10Handle, szInFile, I106_READ);
+    enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
     if (enStatus != I106_OK)
         {
-        printf("Error opening data file : Status = %d\n", enStatus);
+        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
         return 1;
         }
 
+    enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
+    if (enStatus != I106_OK)
+        {
+        fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
+        return 1;
+        }
 
 /*
  * Open the output file
  */
 
-    ptOutFile = fopen(szOutFile,"w");
-    if (ptOutFile == NULL) 
+    // If output file specified then open it    
+    if (strlen(szOutFile) != 0)
         {
-        printf("Error opening output file\n");
-        return 1;
+        ptOutFile = fopen(szOutFile,"w");
+        if (ptOutFile == NULL) 
+            {
+            fprintf(stderr, "Error opening output file\n");
+            return 1;
+            }
+        }
+
+    // No output file name so use stdout
+    else
+        {
+        ptOutFile = stdout;
         }
 
 
@@ -280,17 +301,17 @@ int main(int argc, char ** argv)
         {
 
         // Read the next header
-        enStatus = enI106Ch10ReadNextHeader(iI106Ch10Handle, &suI106Hdr);
+        enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
 
         if (enStatus == I106_EOF)
             {
-            printf("End of file\n");
+//            fprintf(stderr, "End of file\n");
             break;
             }
 
         if (enStatus != I106_OK)
             {
-            printf(" Error reading header : Status = %d\n", enStatus);
+            fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
             break;
             }
 
@@ -303,45 +324,31 @@ int main(int argc, char ** argv)
 
         // Read the data buffer
         ulReadSize = ulBuffSize;
-        enStatus = enI106Ch10ReadData(iI106Ch10Handle, &ulBuffSize, pvBuff);
+        enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
         if (enStatus != I106_OK)
             {
-            printf(" Error reading header : Status = %d\n", enStatus);
+            fprintf(stderr, " Error reading data : Status = %d\n", enStatus);
             break;
             }
 
         suCnt.ulTotal++;
-        if (bVerbose) printf("%8.8ld Messages \r",suCnt.ulTotal);
+        if (bVerbose) 
+            fprintf(stderr, "%8.8ld Messages \r",suCnt.ulTotal);
 
-        // Keep track of file and data start and stop times
-        if (suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS)
+        // Save data start and stop times
+        if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS) &&
+            (suI106Hdr.ubyDataType != I106CH10_DTYPE_IRIG_TIME))
             {
-
-            // Convert relative time to clock time
-            enI106_Rel2IrigTime(iI106Ch10Handle, suI106Hdr.aubyRefTime, &suIrigTime);
-
-            // Only calculate file start time from time message
-            if (suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME)
+            if (bFoundDataStartTime == bFALSE) 
                 {
-                if (suCnt.lFileStartTime == 0L)
-                    suCnt.lFileStartTime = suIrigTime.ulSecs;
-                } // end if IRIG time message
-
-            // Anything else is a data packet
+                memcpy((char *)suCnt.abyStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+                bFoundDataStartTime = bTRUE;
+                }
             else
                 {
-                if (suCnt.lStartTime == 0L) 
-                    {
-                    suCnt.lStartTime = suIrigTime.ulSecs;
-                    memcpy(&suCnt.llStartTime, &suI106Hdr.aubyRefTime[0], 6);
-                    }
-                else
-                    {
-                    suCnt.lStopTime  = suIrigTime.ulSecs;
-                    memcpy(&suCnt.llStopTime, &suI106Hdr.aubyRefTime[0], 6);
-                    }
+                memcpy((char *)suCnt.abyStopTime, (char *)suI106Hdr.aubyRefTime, 6);
                 }
-            } // end if not TMATS
+            } // end if data message
 
         // Log the various data types
         switch (suI106Hdr.ubyDataType)
@@ -353,6 +360,10 @@ int main(int argc, char ** argv)
                 // Only decode the first TMATS record
                 if (suCnt.ulTMATS != 0)
                     {
+                    // Save file start time
+                    memcpy((char *)&suCnt.abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+
+                    // Process TMATS info for later use
                     enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
                     if (enStatus != I106_OK) 
                         break;
@@ -397,14 +408,6 @@ int main(int argc, char ** argv)
                     // Get the next 1553 message
                     enStatus = enI106_Decode_Next1553F1(&su1553Msg);
                     }
-/*
-          // Pack parameters to make an array index
-          if (ptMonMsg->suStatus.wBusNum >= MAX_1553_BUSES) {
-            printf("1553 bus number '%d' > Max number of buses supported '%d'",
-              ptMonMsg->suStatus.wBusNum, MAX_1553_BUSES);
-            break;
-            }
-*/
 
                     // If logging RT to RT then do it for second command word
                     if (su1553Msg.psu1553Hdr->bRT2RT == 1)
@@ -436,19 +439,20 @@ int main(int argc, char ** argv)
  * ---------------------------------------
  */
 
-  vPrintCounts(&suCnt, ptOutFile);
+    vPrintTmats(&suTmatsInfo, ptOutFile);
+    vPrintCounts(&suCnt, ptOutFile);
 
 /*
  *  Free dynamic memory.
  */
 
-  free(pvBuff);
-  pvBuff = NULL;
+    free(pvBuff);
+    pvBuff = NULL;
 
-  fclose(ptOutFile);
+    fclose(ptOutFile);
 
-  return 0;
-  }
+    return 0;
+    }
 
 
 
@@ -484,25 +488,18 @@ void vResetCounts(SuCounts * psuCnt)
 
 void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
     {
-    long        lMsgIdx;
-    unsigned    uChanID;
-    struct tm * psuTmTime;
-    char        szTime[50];
-    char      * szTimeFmt = "%m/%d/%Y %H:%M:%S";
+    long            lMsgIdx;
+    unsigned        uChanID;
+    struct tm     * psuTmTime;
+    char            szTime[50];
+    char          * szTimeFmt = "%m/%d/%Y %H:%M:%S";
+    SuIrig106Time   suIrigTime;
 
-    fprintf(ptOutFile,"\n=-=-= Message Totals by Type-=-=-=\n\n", psuCnt->ulTotal);
+//    uint64_t        llFileStartTime;
+//    uint64_t        llStartTime;
+//    uint64_t        llStopTime;
 
-    psuTmTime = gmtime(&(psuCnt->lFileStartTime));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"File Start %s\n",  szTime);
-
-    psuTmTime = gmtime(&(psuCnt->lStartTime));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Start %s (%ld)\n",  szTime, psuCnt->llStartTime);
-
-    psuTmTime = gmtime(&(psuCnt->lStopTime));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Stop  %s (%ld)\n\n",  szTime, psuCnt->llStopTime);
+    fprintf(ptOutFile,"\n=-=-= Message Totals by Type =-=-=\n\n");
 
 /*
   if (psuCnt->ulHeader != 0)
@@ -563,6 +560,23 @@ void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
 
     fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", psuCnt->ulTotal);
 
+    fprintf(ptOutFile,"=-=-= File Time Summary =-=-=\n\n");
+
+    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyFileStartTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"File Start %s\n",  szTime);
+
+    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyStartTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Start %s\n",  szTime);
+
+    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyStopTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Stop  %s\n\n",  szTime);
+
     return;
     }
 
@@ -571,6 +585,65 @@ void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
 
 /* ------------------------------------------------------------------------ */
 
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+    {
+    int                     iGIndex;
+    int                     iRIndex;
+    int                     iRDsiIndex;
+    SuGDataSource         * psuGDataSource;
+    SuRRecord             * psuRRecord;
+    SuRDataSource         * psuRDataSource;
+
+    // Print out the TMATS info
+    // ------------------------
+
+    fprintf(ptOutFile,"\n=-=-= Channel Summary =-=-=\n\n");
+
+    // G record
+    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(ptOutFile,"IRIG 106 Rev - %s\n",psuTmatsInfo->psuFirstGRecord->szIrig106Rev);
+    fprintf(ptOutFile,"Channel  Type          Data Source         \n");
+    fprintf(ptOutFile,"-------  ------------  --------------------\n");
+
+    // Data sources
+    psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
+    do  {
+        if (psuGDataSource == NULL) break;
+
+        // G record data source info
+        iGIndex = psuGDataSource->iDataSourceNum;
+
+        // R record info
+        psuRRecord = psuGDataSource->psuRRecord;
+        do  {
+            if (psuRRecord == NULL) break;
+            iRIndex = psuRRecord->iRecordNum;
+
+            // R record data sources
+            psuRDataSource = psuRRecord->psuFirstDataSource;
+            do  {
+                if (psuRDataSource == NULL) break;
+                iRDsiIndex = psuRDataSource->iDataSourceNum;
+                fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                fprintf(ptOutFile,"  %-12s", psuRDataSource->szChannelDataType);
+                fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                fprintf(ptOutFile,"\n");
+                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                } while (bTRUE);
+
+            psuRRecord = psuRRecord->psuNextRRecord;
+            } while (bTRUE);
+
+
+        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        } while (bTRUE);
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
 
 void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
     {
@@ -596,7 +669,7 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
         while (psuRDataSrc != NULL)
             {
             // See if 1553 channel data type
-            if (stricmp(psuRDataSrc->szChannelDataType,"1553IN") == 0)
+            if (strcasecmp(psuRDataSrc->szChannelDataType,"1553IN") == 0)
                 {
                 m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanType = CHANTYPE_1553;
                 m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanIdx  = u1553ChanIdx++;
@@ -644,6 +717,5 @@ void vUsage(void)
   printf("   -r         Log both sides of RT to RT transfers\n");
   printf("   -v         Verbose\n");
   }
-
 
 

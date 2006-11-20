@@ -37,14 +37,16 @@
  Created by Bob Baggerman
 
  $RCSfile: i106trim.c,v $
- $Date: 2006-10-26 11:17:15 $
- $Revision: 1.3 $
+ $Date: 2006-11-20 04:34:21 $
+ $Revision: 1.4 $
 
   ==========================================================================*/
 
 #include <stdio.h>
-#include <conio.h>
+#include <stdlib.h>
+//#include <conio.h>
 #include <time.h>
+#include <memory.h>
 //#include <dos.h>
 
 #include "stdint.h"
@@ -66,9 +68,9 @@
 #define bFALSE  (1==0)
 #endif
 
-#define SECS(hr,min,sec) (hr*60L*60L + min*60L + sec)
+// #define SECS(hr,min,sec) (hr*60L*60L + min*60L + sec)
 
-#define READ_BUFF_SIZE       100000
+// #define READ_BUFF_SIZE       100000
 
 /*
  * Data structures
@@ -89,8 +91,9 @@ unsigned long   m_ulBuffSize = 0L;
  * -------------------
  */
 
-void vStats(char *szFileName);
+// void vStats(char *szFileName);
 void vUsage(void);
+time_t mkgmtime(struct tm * tm);
 
 
 
@@ -98,38 +101,42 @@ void vUsage(void);
 
 int main (int argc, char *argv[])
     {
-    int              iI106Ch10Handle;
-    int              iI106_In;    // Input data file handle
-    int              iI106_Out;   // Output data file handle
-    unsigned long    ulIrigTime;
+    int                 iI106_In;    // Input data file handle
+    int                 iI106_Out;   // Output data file handle
+//    unsigned long       ulIrigTime;
 
-    EnI106Status     enStatus;
+    EnI106Status        enStatus;
 
-    unsigned short   usMsgType;
-    SuIrig106Time    suTime;
-    unsigned short   usBuffSize;
-    void *           pvBuff = NULL;
+    SuI106Ch10Header    suI106Hdr;
+//    unsigned short      usMsgType;
+    SuIrig106Time       suTime;
+    unsigned long       ulBuffSize = 0;
+    void              * pvBuff = NULL;
 
-    struct tm      * ptPCDateTime;
+    struct tm         * psuTmTime;
 
-    int              iArgIdx;
-    int              iInHour;
-    int              iInMin;
-    int              iInSec;
+    int                 iArgIdx;
+    int                 iStartHour, iStartMin, iStartSec;
+    int                 iStopHour,  iStopMin,  iStopSec;
 
-    long             lWriteMsgs = 0L;
+    long                lWriteMsgs = 0L;
 
-    long             lStartTimeOffset = -1L;
-    long             lStopTimeOffset  = -1L;
-    long             lStartTime = -1L;
-    long             lStopTime  = -1L;
+    uint8_t             abyStartTime[6];
+    uint8_t             abyStopTime[6];
+    SuIrig106Time       suStartTime;
+    SuIrig106Time       suStopTime;
+    int64_t             llStartTime      = -1L;
+    int64_t             llStopTime       = -1L;
+    int64_t             llPacketTime;
 
-    int              iStatus;
+    int                 bUseStartTime;
+    int                 bUseStopTime;
+    int                 bFoundTmats = bFALSE;
+    int                 bFoundTime  = bFALSE;
+    int                 bCopyPacket;
 
+    int                 iStatus;
 
-    // Make sure things stay on UTC
-//    putenv("TZ=GMT0");
-//    tzset();
 
 /*
  * Process the command line arguments
@@ -141,11 +148,8 @@ int main (int argc, char *argv[])
         return 1;
         }
 
-    if (argc == 2) 
-        {
-        vStats(argv[1]);
-        return 0;
-        }
+    bUseStartTime = bFALSE;
+    bUseStopTime  = bFALSE;
 
     for (iArgIdx=3; iArgIdx<argc; iArgIdx++) 
         {
@@ -154,158 +158,216 @@ int main (int argc, char *argv[])
             {
 
             case '+' :
-                iStatus = sscanf(argv[iArgIdx],"+%d:%d:%d",&iInHour,&iInMin,&iInSec);
+                iStatus = sscanf(argv[iArgIdx],"+%d:%d:%d",
+                    &iStartHour,&iStartMin,&iStartSec);
                 if (iStatus != 3) 
                     {
                     vUsage();
                     return 1;
                     }
-                lStartTimeOffset = SECS(iInHour, iInMin, iInSec);
+                bUseStartTime = bTRUE;
                 break;
 
             case '-' :
-                iStatus = sscanf(argv[iArgIdx],"-%d:%d:%d",&iInHour,&iInMin,&iInSec);
+                iStatus = sscanf(argv[iArgIdx],"-%d:%d:%d",
+                    &iStopHour,&iStopMin,&iStopSec);
                 if (iStatus != 3) 
                     {
                     vUsage();
                     return 1;
                     }
-                lStopTimeOffset = SECS(iInHour, iInMin, iInSec);
+                bUseStopTime = bTRUE;
                 break;
 
             } /* end command line arg switch */
         } /* end for all arguments */
 
 /*
- * Open the input file
+ * Open the input file and get things setup
  */
 
     // Open the input data file
-    enStatus = enI106Ch10Open(&iI106Ch10Handle, argv[1], I106_READ);
+    enStatus = enI106Ch10Open(&iI106_In, argv[1], I106_READ);
     if (enStatus != I106_OK)
         {
-        printf("Error opening data file : Status = %d\n", enStatus);
+        fprintf(stderr, "Error opening input data file : Status = %d\n", enStatus);
         return 1;
         }
 
-// DO THIS IN READ LOOP
-    // Make the input data buffer
-    pvBuff = malloc(READ_BUFF_SIZE);
-
-    // Find and read the first data packet to get the start time
-
-
-
-
-    // Set start and stop times
-// Watch out for time zone in mktime();
-    ptPCDateTime = gmtime(&tTime.lTimeMS);
-    ptPCDateTime->tm_hour = 0;
-    ptPCDateTime->tm_min  = 0;
-    ptPCDateTime->tm_sec  = 0;
-    if (lStartTimeOffset != -1) 
-    {
-    lStartTime = mktime(ptPCDateTime) + lStartTimeOffset;
-    } // end set start time
-  if (lStopTimeOffset != -1) {
-    if (lStopTimeOffset < lStartTimeOffset)
-      lStopTimeOffset += 60L*60L*24L;
-    lStopTime = mktime(ptPCDateTime) + lStopTimeOffset;
-    } // end set stop time
-
-
-  // Reset the data file to the beginning
-  FfdClose(&tFFD_In);
-  FfdOpen(&tFFD_In, argv[1], EnBioMode_READ, usBuffSize);
+    // Get clock time synchronized
+    enStatus = enI106_SyncTime(iI106_In, bFALSE, 0);
+    if (enStatus != I106_OK)
+        {
+        fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
+        return 1;
+        }
 
 /*
  * Open the output file
  */
-  iStatus = FfdOpen(&tFFD_Out, argv[2], EnBioMode_OVERWRITE, tFFD_In.wMaxBuffSize);
-  if (iStatus != EnFfdStatus_OK) {
-    printf ("\nERROR %d opening output file\n",iStatus);
-    return 1;
-    }
+    enStatus = enI106Ch10Open(&iI106_Out, argv[2], I106_OVERWRITE);
+    if (enStatus != I106_OK)
+        {
+        fprintf(stderr, "Error opening output data file : Status = %d\n", enStatus);
+        return 1;
+        }
 
 /*
  * Print out some info and get started
  */
 
-  printf("Input Data File  '%s'\n",argv[1]);
-  printf("Output Data File '%s'\n",argv[2]);
+    printf("Input Data File  '%s'\n",argv[1]);
+    printf("Output Data File '%s'\n",argv[2]);
+
+/*
+ * Read the first message header and setup some stuff
+ */
+    
+    // Read the first message header
+    enStatus = enI106Ch10ReadNextHeader(iI106_In, &suI106Hdr);
+
+    // Check for read errors and end of file
+    if (enStatus == I106_EOF) 
+        {
+        fprintf(stderr, "EOF reading header\n");
+        return 1;
+        }
+
+    if (enStatus != I106_OK)
+        {
+        fprintf(stderr, "Error reading header : Status = %d\n", enStatus);
+        return 1;
+        }
+
+    // Figure out start/stop counts
+    enStatus = enI106_Rel2IrigTime(iI106_In, suI106Hdr.aubyRefTime, &suTime);
+    psuTmTime = gmtime((time_t *)&suTime.ulSecs);
+
+    if (bUseStartTime == bTRUE)
+        {
+        psuTmTime->tm_hour = iStartHour;
+        psuTmTime->tm_min  = iStartMin;
+        psuTmTime->tm_sec  = iStartSec;
+        suStartTime.ulFrac = 0L;
+        suStartTime.ulSecs = mkgmtime(psuTmTime);
+        enI106_Irig2RelTime(iI106_In, &suStartTime, abyStartTime);
+        llStartTime = 0L;
+        memcpy((char *)&(llStartTime), (char *)&abyStartTime, 6);
+        }
+
+    if (bUseStopTime == bTRUE)
+        {
+        psuTmTime->tm_hour = iStopHour;
+        psuTmTime->tm_min  = iStopMin;
+        psuTmTime->tm_sec  = iStopSec;
+        suStopTime.ulFrac = 0L;
+        suStopTime.ulSecs = mkgmtime(psuTmTime);
+        enI106_Irig2RelTime(iI106_In, &suStopTime, abyStopTime);
+        llStopTime = 0L;
+        memcpy((char *)&(llStopTime), (char *)&abyStopTime, 6);
+        // Handle midnight rollover
+        if ((bUseStartTime == bTRUE) && (llStopTime < llStartTime))
+            llStopTime += (int64_t)(60 * 60 * 24) * (int64_t)10000000;
+        }
+
+    // Try jumping to the start time
+    if (bUseStartTime == bTRUE) 
+        {
+// SUPPORT FOR THIS IS NOT QUITE READY YET
+        }
 
 /*
  * Read data packets until EOF
  */
 
-  lWriteMsgs = 0;
+    lWriteMsgs = 0L;
+    while (bTRUE) 
+        {
 
-  // Read and write header (i.e. MsgType < 0x1000) messages
-  while (bTRUE) 
-    {
+        vTimeArray2LLInt(suI106Hdr.aubyRefTime, &llPacketTime);
+        bCopyPacket = bFALSE;
 
-    // Read data packet and look for trouble
-    usBuffSize = (unsigned short)READ_BUFF_SIZE;
-    iStatus = FfdReadNextMessage(&tFFD_In, &usMsgType, &tTime, &usBuffSize, pvBuff);
+        // If before time limit, handle any special processing
+        if ((bUseStartTime == bTRUE) && (llPacketTime < llStartTime))
+            {
 
-    if (iStatus == EnBioStatus_EOF) break;
-    if (iStatus != EnBioStatus_OK)  continue;
+            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_TMATS) &&
+                (bFoundTmats           == bFALSE))
+                {
+                // If it's TMATS, rewrite some of the fields
+// SAVE THIS MESS FOR ANOTHER DAY
+                bCopyPacket = bTRUE;
+                bFoundTmats = bTRUE;
+                }
 
-    // If header message write it out
-    if (usMsgType <= 0x0fff) 
-      {
-      iStatus = FfdWriteNextMessage(&tFFD_Out, usMsgType, &tTime, usBuffSize, pvBuff);
-      lWriteMsgs++;
-      } // end if write header message
+            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME) &&
+                (bFoundTime            == bFALSE))
+                {
+                bCopyPacket = bTRUE;
+                bFoundTime  = bTRUE;
+                }
 
-    // Not header so backup and exit loop
-    else
-      {
-      iStatus = FfdPrevMsg(&tFFD_In);
-      break;
-      }
+// MIGHT NEED TO DO SOME STUFF WITH INDEX PACKETS HERE
+            } // if before time limit
 
-    } // end while read/write headers
+        // If after time limit, handle any special processing
+        else if ((bUseStopTime  == bTRUE) && (llPacketTime > llStopTime ))
+            break;
 
-  // Try jumping to the start time
-  if (lStartTimeOffset != -1) 
-    {
-    tTime.lTimeMS = lStartTime;
-    tTime.sTimeLS = 0;
-    iStatus = FfdSeekToTime (&tFFD_In, &tTime);
-//    printf("FfdSeekToTime() = %d\n", iStatus);
-    }
+        // Any other state is just a copy
+        else
+            bCopyPacket = bTRUE;
 
-  // Now loop through packets
-  while (bTRUE) {
+        // Read and copy to packet to the output file
+        if (bCopyPacket == bTRUE)
+            {
 
-    // Read data packet and look for trouble
-    usBuffSize = (unsigned short)READ_BUFF_SIZE;
-    iStatus = FfdReadNextMessage(&tFFD_In, &usMsgType, &tTime, &usBuffSize, pvBuff);
+            // Make sure our buffer is big enough, size *does* matter
+            if (ulBuffSize < suI106Hdr.ulDataLen+8)
+                {
+                pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
+                ulBuffSize = suI106Hdr.ulDataLen+8;
+                }
 
-    if (iStatus == EnBioStatus_EOF) break;
-    if (iStatus != EnBioStatus_OK)  continue;
+            // Read the data
+            enStatus = enI106Ch10ReadData(iI106_In, ulBuffSize, pvBuff);
+            if (enStatus != I106_OK)
+                {
+                fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
+                continue;
+                }
 
-    // Only check time if not a header message
-    if (usMsgType > 0x0fff) {
-      // Check the time and write it if time OK
-      if ((lStartTime != -1) && (lStartTime >  tTime.lTimeMS)) continue;
-      if ((lStopTime  != -1) && (lStopTime  <= tTime.lTimeMS)) break;
-      } // end if not header message
+            // If it's an index record fix it up
+// NEED TO IMPLEMENT INDEX RECORDS SOME DAY
 
-    iStatus = FfdWriteNextMessage(&tFFD_Out, usMsgType, &tTime, usBuffSize, pvBuff);
-    lWriteMsgs++;
+            // Write it to the output file
+            enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
+            }
+        lWriteMsgs++;
 
-    } // end while read/write
+        // Read the next message header
+        enStatus = enI106Ch10ReadNextHeader(iI106_In, &suI106Hdr);
+
+        // Check for read errors and end of file
+        if (enStatus == I106_EOF) 
+            break;
+
+        if (enStatus != I106_OK)
+            {
+            fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
+            continue;
+            }
+
+        } // end while read/write
 
 /*
  * Print some stats, close the files, and get outa here
  */
 
-  printf("Packets Written %ld\n",lWriteMsgs);
+    printf("Packets Written %ld\n",lWriteMsgs);
 
-  FfdClose(&tFFD_In);
-  FfdClose(&tFFD_Out);
+    enI106Ch10Close(iI106_In);
+    enI106Ch10Close(iI106_Out);
 
 
   return 0;
@@ -313,6 +375,7 @@ int main (int argc, char *argv[])
 
 
 
+#if 0
 /* ------------------------------------------------------------------------ */
 
 void vStats(char *szFileName)
@@ -356,20 +419,6 @@ void vStats(char *szFileName)
 
 /* ------------------------------------------------------------------------ */
 
-void vUsage(void)
-  {
-  printf("I106TRIM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
-  printf("  +hh:mm:ss - Start copy time\n");
-  printf("  -hh:mm:ss - Stop copy time\n");
-  printf("Or:    fftrim <infile> to get stats\n");
-  return;
-  }
-
-
-
-/* ------------------------------------------------------------------------ */
-
 // Find the first IRIG time message
 
 int iFindFirstTime(int iI106Handle)
@@ -406,6 +455,22 @@ int iFindFirstTime(int iI106Handle)
 
     return 1;
     } // end iFindFirstTime()
+
+
+
+#endif
+
+/* ------------------------------------------------------------------------ */
+
+void vUsage(void)
+  {
+  printf("I106TRIM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+  printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
+  printf("  +hh:mm:ss - Start copy time\n");
+  printf("  -hh:mm:ss - Stop copy time\n");
+  printf("Or:    fftrim <infile> to get stats\n");
+  return;
+  }
 
 
 
