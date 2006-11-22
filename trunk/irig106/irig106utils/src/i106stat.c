@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-11-20 04:34:21 $
- $Revision: 1.5 $
+ $Date: 2006-11-22 13:19:56 $
+ $Revision: 1.6 $
 
  ****************************************************************************/
 
@@ -100,10 +100,16 @@ typedef struct
     unsigned long * pul1553Msgs;
     unsigned long * pul1553Errs;
     unsigned long   ulErrTimeout;
+    unsigned long   ulUserDefined;
     unsigned long   ulIrigTime;
+    unsigned long   ulAnalog;
     unsigned long   ulTMATS;
+    unsigned long   ulEvents;
+    unsigned long   ulIndex;
+    unsigned long   ulPCM;
     unsigned long   ulMonitor;
     unsigned long   ulMPEG2;
+    unsigned long   ulUART;
     unsigned long   ulOther;
     unsigned long   ulTotal;
 
@@ -354,7 +360,11 @@ int main(int argc, char ** argv)
         switch (suI106Hdr.ubyDataType)
             {
 
-            case I106CH10_DTYPE_TMATS :         // 0x01
+            case I106CH10_DTYPE_USER_DEFINED :      // 0x00
+                suCnt.ulUserDefined++;
+                break;
+
+            case I106CH10_DTYPE_TMATS :             // 0x01
                 suCnt.ulTMATS++;
 
                 // Only decode the first TMATS record
@@ -371,15 +381,23 @@ int main(int argc, char ** argv)
                     }
                 break;
 
-            case I106CH10_DTYPE_IRIG_TIME :     // 0x11
+            case I106CH10_DTYPE_RECORDING_EVENT :   // 0x02
+                suCnt.ulEvents++;
+                break;
+
+            case I106CH10_DTYPE_RECORDING_INDEX :   // 0x03
+                suCnt.ulIndex++;
+                break;
+
+            case I106CH10_DTYPE_PCM :               // 0x09
+                suCnt.ulPCM++;
+                break;
+
+            case I106CH10_DTYPE_IRIG_TIME :         // 0x11
                 suCnt.ulIrigTime++;
                 break;
 
-            case I106CH10_DTYPE_MPEG2 :         // 0x40
-                suCnt.ulMPEG2++;
-                break;
-
-            case I106CH10_DTYPE_1553_FMT_1 :    // 0x19
+            case I106CH10_DTYPE_1553_FMT_1 :        // 0x19
 
                 uChanIdx = m_asuChanInfo[suI106Hdr.ubyDataType].uChanIdx;
 //              if (m_asuChanInfo[suI106Hdr.ubyDataType].uChanType != CHANTYPE_1553)
@@ -425,9 +443,21 @@ int main(int argc, char ** argv)
 
                 break;
 
-        default:
-            suCnt.ulOther++;
-            break;
+            case I106CH10_DTYPE_ANALOG :            // 0x21
+                suCnt.ulAnalog++;
+                break;
+
+            case I106CH10_DTYPE_MPEG2 :             // 0x40
+                suCnt.ulMPEG2++;
+                break;
+
+            case I106CH10_DTYPE_UART :              // 0x50
+                suCnt.ulUART++;
+                break;
+
+            default:
+                suCnt.ulOther++;
+                break;
         } // end switch on message type
 
     }   /* End while */
@@ -546,11 +576,29 @@ void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
 
         } // end if 1553 messages
 
+    if (psuCnt->ulUserDefined != 0)
+        fprintf(ptOutFile,"User Defined      %10lu\n",   psuCnt->ulUserDefined);
+
+    if (psuCnt->ulEvents != 0)
+        fprintf(ptOutFile,"Events            %10lu\n",   psuCnt->ulEvents);
+
+    if (psuCnt->ulIndex != 0)
+        fprintf(ptOutFile,"Index             %10lu\n",   psuCnt->ulIndex);
+
+    if (psuCnt->ulPCM != 0)
+        fprintf(ptOutFile,"PCM               %10lu\n",   psuCnt->ulPCM);
+
     if (psuCnt->ulIrigTime != 0)
         fprintf(ptOutFile,"IRIG Time         %10lu\n",   psuCnt->ulIrigTime);
 
+    if (psuCnt->ulAnalog != 0)
+        fprintf(ptOutFile,"Analog            %10lu\n",   psuCnt->ulAnalog);
+
     if (psuCnt->ulMPEG2 != 0)
         fprintf(ptOutFile,"MPEG Video        %10lu\n",   psuCnt->ulMPEG2);
+
+    if (psuCnt->ulUART != 0)
+        fprintf(ptOutFile,"UART              %10lu\n",   psuCnt->ulUART);
 
     if (psuCnt->ulTMATS != 0)
         fprintf(ptOutFile,"TMATS             %10lu\n",   psuCnt->ulTMATS);
