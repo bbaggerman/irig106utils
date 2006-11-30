@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-11-22 13:19:56 $
- $Revision: 1.6 $
+ $Date: 2006-11-30 02:42:59 $
+ $Revision: 1.7 $
 
  ****************************************************************************/
 
@@ -121,6 +121,7 @@ typedef struct
     unsigned char   abyStopTime[6];
     int             bLogRT2RT;
     int             bRT2RTFound;
+    unsigned long   ulReadErrors;
     } SuCounts;
 
 // Channel ID info
@@ -309,159 +310,174 @@ int main(int argc, char ** argv)
         // Read the next header
         enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
 
-        if (enStatus == I106_EOF)
+        // Setup a one time loop to make it easy to break out on error
+        do
             {
-//            fprintf(stderr, "End of file\n");
-            break;
-            }
-
-        if (enStatus != I106_OK)
-            {
-            fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
-            break;
-            }
-
-        // Make sure our buffer is big enough, size *does* matter
-        if (ulBuffSize < suI106Hdr.ulDataLen+8)
-            {
-            pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
-            ulBuffSize = suI106Hdr.ulDataLen+8;
-            }
-
-        // Read the data buffer
-        ulReadSize = ulBuffSize;
-        enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
-        if (enStatus != I106_OK)
-            {
-            fprintf(stderr, " Error reading data : Status = %d\n", enStatus);
-            break;
-            }
-
-        suCnt.ulTotal++;
-        if (bVerbose) 
-            fprintf(stderr, "%8.8ld Messages \r",suCnt.ulTotal);
-
-        // Save data start and stop times
-        if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS) &&
-            (suI106Hdr.ubyDataType != I106CH10_DTYPE_IRIG_TIME))
-            {
-            if (bFoundDataStartTime == bFALSE) 
+            if (enStatus == I106_EOF)
                 {
-                memcpy((char *)suCnt.abyStartTime, (char *)suI106Hdr.aubyRefTime, 6);
-                bFoundDataStartTime = bTRUE;
+                fprintf(stderr, "End of file\n");
+                break;
                 }
-            else
+
+            // Check for header read errors
+            if (enStatus != I106_OK)
                 {
-                memcpy((char *)suCnt.abyStopTime, (char *)suI106Hdr.aubyRefTime, 6);
+                suCnt.ulReadErrors++;
+                break;
                 }
-            } // end if data message
 
-        // Log the various data types
-        switch (suI106Hdr.ubyDataType)
-            {
+            // Make sure our buffer is big enough, size *does* matter
+            if (ulBuffSize < suI106Hdr.ulDataLen+8)
+                {
+                pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
+                ulBuffSize = suI106Hdr.ulDataLen+8;
+                }
 
-            case I106CH10_DTYPE_USER_DEFINED :      // 0x00
-                suCnt.ulUserDefined++;
+            // Read the data buffer
+            ulReadSize = ulBuffSize;
+            enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
+
+            // Check for data read errors
+            if (enStatus != I106_OK)
+                {
+                suCnt.ulReadErrors++;
                 break;
+                }
 
-            case I106CH10_DTYPE_TMATS :             // 0x01
-                suCnt.ulTMATS++;
+            suCnt.ulTotal++;
+            if (bVerbose) 
+                fprintf(stderr, "%8.8ld Messages \r",suCnt.ulTotal);
 
-                // Only decode the first TMATS record
-                if (suCnt.ulTMATS != 0)
+            // Save data start and stop times
+            if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS) &&
+                (suI106Hdr.ubyDataType != I106CH10_DTYPE_IRIG_TIME))
+                {
+                if (bFoundDataStartTime == bFALSE) 
                     {
-                    // Save file start time
-                    memcpy((char *)&suCnt.abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
-
-                    // Process TMATS info for later use
-                    enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
-                    if (enStatus != I106_OK) 
-                        break;
-                    vProcessTmats(&suTmatsInfo);
+                    memcpy((char *)suCnt.abyStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+                    bFoundDataStartTime = bTRUE;
                     }
-                break;
-
-            case I106CH10_DTYPE_RECORDING_EVENT :   // 0x02
-                suCnt.ulEvents++;
-                break;
-
-            case I106CH10_DTYPE_RECORDING_INDEX :   // 0x03
-                suCnt.ulIndex++;
-                break;
-
-            case I106CH10_DTYPE_PCM :               // 0x09
-                suCnt.ulPCM++;
-                break;
-
-            case I106CH10_DTYPE_IRIG_TIME :         // 0x11
-                suCnt.ulIrigTime++;
-                break;
-
-            case I106CH10_DTYPE_1553_FMT_1 :        // 0x19
-
-                uChanIdx = m_asuChanInfo[suI106Hdr.ubyDataType].uChanIdx;
-//              if (m_asuChanInfo[suI106Hdr.ubyDataType].uChanType != CHANTYPE_1553)
-
-                // Step through all 1553 messages
-                enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
-                while (enStatus == I106_OK)
+                else
                     {
-
-                    // Update message count
-                    usPackedIdx  = 0;
-                    usPackedIdx |=  uChanIdx                          << 11;
-                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0xF800) >> 5;
-                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x0400) >> 5;
-                    usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x03E0) >> 5;
-                    suCnt.pul1553Msgs[usPackedIdx]++;
-                    suCnt.ulMonitor++;
-
-                    // Update the error counts
-                    if (su1553Msg.psu1553Hdr->bMsgError != 0) 
-                        suCnt.pul1553Errs[usPackedIdx]++;
-
-                    if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
-                        suCnt.ulErrTimeout++;
-
-                    // Get the next 1553 message
-                    enStatus = enI106_Decode_Next1553F1(&su1553Msg);
+                    memcpy((char *)suCnt.abyStopTime, (char *)suI106Hdr.aubyRefTime, 6);
                     }
+                } // end if data message
 
-                    // If logging RT to RT then do it for second command word
-                    if (su1553Msg.psu1553Hdr->bRT2RT == 1)
-                        suCnt.bRT2RTFound = bTRUE;
+            // Log the various data types
+            switch (suI106Hdr.ubyDataType)
+                {
 
-                    if (suCnt.bLogRT2RT==bTRUE) 
+                case I106CH10_DTYPE_USER_DEFINED :      // 0x00
+                    suCnt.ulUserDefined++;
+                    break;
+
+                case I106CH10_DTYPE_TMATS :             // 0x01
+                    suCnt.ulTMATS++;
+
+                    // Only decode the first TMATS record
+                    if (suCnt.ulTMATS != 0)
                         {
+                        // Save file start time
+                        memcpy((char *)&suCnt.abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+
+                        // Process TMATS info for later use
+                        enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
+                        if (enStatus != I106_OK) 
+                            break;
+                        vProcessTmats(&suTmatsInfo);
+                        }
+                    break;
+
+                case I106CH10_DTYPE_RECORDING_EVENT :   // 0x02
+                    suCnt.ulEvents++;
+                    break;
+
+                case I106CH10_DTYPE_RECORDING_INDEX :   // 0x03
+                    suCnt.ulIndex++;
+                    break;
+
+                case I106CH10_DTYPE_PCM :               // 0x09
+                    suCnt.ulPCM++;
+                    break;
+
+                case I106CH10_DTYPE_IRIG_TIME :         // 0x11
+                    suCnt.ulIrigTime++;
+                    break;
+
+                case I106CH10_DTYPE_1553_FMT_1 :        // 0x19
+
+                    uChanIdx = m_asuChanInfo[suI106Hdr.ubyDataType].uChanIdx;
+    //              if (m_asuChanInfo[suI106Hdr.ubyDataType].uChanType != CHANTYPE_1553)
+
+                    // Step through all 1553 messages
+                    enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
+                    while (enStatus == I106_OK)
+                        {
+
+                        // Update message count
                         usPackedIdx  = 0;
                         usPackedIdx |=  uChanIdx                          << 11;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0xF800) >> 5;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x0400) >> 5;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x03E0) >> 5;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0xF800) >> 5;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x0400) >> 5;
+                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x03E0) >> 5;
                         suCnt.pul1553Msgs[usPackedIdx]++;
-                    } // end if logging RT to RT
+                        suCnt.ulMonitor++;
 
-                break;
+                        // Update the error counts
+                        if (su1553Msg.psu1553Hdr->bMsgError != 0) 
+                            suCnt.pul1553Errs[usPackedIdx]++;
 
-            case I106CH10_DTYPE_ANALOG :            // 0x21
-                suCnt.ulAnalog++;
-                break;
+                        if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
+                            suCnt.ulErrTimeout++;
 
-            case I106CH10_DTYPE_MPEG2 :             // 0x40
-                suCnt.ulMPEG2++;
-                break;
+                        // Get the next 1553 message
+                        enStatus = enI106_Decode_Next1553F1(&su1553Msg);
+                        }
 
-            case I106CH10_DTYPE_UART :              // 0x50
-                suCnt.ulUART++;
-                break;
+                        // If logging RT to RT then do it for second command word
+                        if (su1553Msg.psu1553Hdr->bRT2RT == 1)
+                            suCnt.bRT2RTFound = bTRUE;
 
-            default:
-                suCnt.ulOther++;
-                break;
-        } // end switch on message type
+                        if (suCnt.bLogRT2RT==bTRUE) 
+                            {
+                            usPackedIdx  = 0;
+                            usPackedIdx |=  uChanIdx                          << 11;
+                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0xF800) >> 5;
+                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x0400) >> 5;
+                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x03E0) >> 5;
+                            suCnt.pul1553Msgs[usPackedIdx]++;
+                        } // end if logging RT to RT
 
-    }   /* End while */
+                    break;
 
+                case I106CH10_DTYPE_ANALOG :            // 0x21
+                    suCnt.ulAnalog++;
+                    break;
+
+                case I106CH10_DTYPE_MPEG2 :             // 0x40
+                    suCnt.ulMPEG2++;
+                    break;
+
+                case I106CH10_DTYPE_UART :              // 0x50
+                    suCnt.ulUART++;
+                    break;
+
+                default:
+                    suCnt.ulOther++;
+                    break;
+
+                } // end switch on message type
+
+            } while (bFALSE); // end one time loop
+
+        // If EOF break out of main read loop
+        if (enStatus == I106_EOF)
+            {
+            fprintf(stderr, "End of file\n");
+            break;
+            }
+
+        }   /* End while */
 
 
 /*
