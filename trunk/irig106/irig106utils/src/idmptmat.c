@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmptmat.c,v $
- $Date: 2006-11-20 04:34:21 $
- $Revision: 1.3 $
+ $Date: 2006-12-04 12:58:00 $
+ $Revision: 1.4 $
 
  ****************************************************************************/
 
@@ -389,8 +389,8 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
     // G record
     fprintf(ptOutFile, "Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
     fprintf(ptOutFile, "IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
-    fprintf(ptOutFile, "Channel  Type          Data Source         \n");
-    fprintf(ptOutFile, "-------  ------------  --------------------\n");
+    fprintf(ptOutFile, "Channel  Type          Enabled   Data Source         \n");
+    fprintf(ptOutFile, "-------  ------------  --------  --------------------\n");
 
     // Data sources
     psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource;
@@ -413,6 +413,7 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
                 iRDsiIndex = psuRDataSource->iDataSourceNum;
                 fprintf(ptOutFile, " %5i ",   psuRDataSource->iTrackNumber);
                 fprintf(ptOutFile, "  %-12s", psuRDataSource->szChannelDataType);
+                fprintf(ptOutFile, "  %-8s",  psuRDataSource->bEnabled ? "Enabled" : "Disabled");
                 fprintf(ptOutFile, "  %-20s", psuRDataSource->szDataSourceID);
                 fprintf(ptOutFile, "\n");
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
