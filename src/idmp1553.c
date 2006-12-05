@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmp1553.c,v $
- $Date: 2006-12-04 13:00:28 $
- $Revision: 1.1 $
+ $Date: 2006-12-05 12:22:32 $
+ $Revision: 1.2 $
 
 */
 
@@ -93,10 +93,8 @@ int           m_iI106Handle;
  * -------------------
  */
 
+void vPrintTmats(void * pvBuff, FILE * ptOutFile);
 void vUsage(void);
-
-//int  iReadNext1553(SuFfdrTime            * ptTime,
-//                   SuFfdSummitMonMsg     * ptMonMsg);
 
 
 /* ------------------------------------------------------------------------ */
@@ -107,15 +105,8 @@ int main(int argc, char ** argv)
     char                    szInFile[80];     // Input file name
     char                    szOutFile[80];    // Output file name
     int                     iArgIdx;
-//    union Cmd_U           * ptCmdWord1;
-//  SuFfdrTime              tTime;
     FILE                  * ptOutFile;        // Output file handle
-//  unsigned short          usMsgType;
-//  unsigned short          usBuffSize;
-//  int                     iChrIdx;
     char                  * szTime;
-//    int                     iStatus;
-//    int                     iWordCnt;
     int                     iWordIdx;
     int                     iMilliSec;
     int                     iChannel;         // Channel number
@@ -129,34 +120,39 @@ int main(int argc, char ** argv)
     int                     bVerbose;
     int                     bDecimal;         // Hex/decimal flag
     int                     bStatusResponse;
+    int                     bPrintTMATS;
     unsigned long           ulBuffSize = 0L;
     unsigned int            uErrorFlags;
 
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
 
-    unsigned char         * pvBuff = NULL;
+    unsigned char         * pvBuff  = NULL;
+    SuIrig106Time           suTime;
     Su1553F1_CurrMsg        su1553Msg;
+    SuTmatsInfo             suTmatsInfo;
 
 
 /*
  * Process the command line arguements
  */
 
-  if (argc < 2) {
-    vUsage();
-    return 1;
-    }
+    if (argc < 2) 
+        {
+        vUsage();
+        return 1;
+        }
 
-  iChannel        = -1;
-  iRTAddr         = -1;
-  iTR             = -1;
-  iSubAddr        = -1;
+    iChannel        = -1;
+    iRTAddr         = -1;
+    iTR             = -1;
+    iSubAddr        = -1;
 
-  uDecimation     = 1;                 /* Decimation factor                 */
-  bVerbose        = bFALSE;            /* No verbosity                      */
-  bDecimal        = bFALSE;
-  bStatusResponse = bFALSE;
+    uDecimation     = 1;                 /* Decimation factor                 */
+    bVerbose        = bFALSE;            /* No verbosity                      */
+    bDecimal        = bFALSE;
+    bStatusResponse = bFALSE;
+    bPrintTMATS     = bFALSE;
 
     szInFile[0]  = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
@@ -217,6 +213,10 @@ int main(int argc, char ** argv)
 
           case 'u' :                   /* Status response flag */
             bStatusResponse = bTRUE;
+            break;
+
+          case 'T' :                   /* Print TMATS flag */
+            bPrintTMATS = bTRUE;
             break;
 
           default :
@@ -282,6 +282,49 @@ int main(int argc, char ** argv)
 
 
 /*
+ * Read the first header. If TMATS flag set, print TMATS and exit
+ */
+
+    // Read first header and check for data read errors
+    enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
+    if (enStatus != I106_OK)
+        return 1;
+
+    // If TMATS flag set, just print TMATS and exit
+    if (bPrintTMATS == bTRUE)
+        {
+        if (suI106Hdr.ubyDataType == I106CH10_DTYPE_TMATS)
+            {
+            // Make a data buffer for TMATS
+            pvBuff = malloc(suI106Hdr.ulPacketLen);
+
+            // Read the data buffer and check for read errors
+            enStatus = enI106Ch10ReadData(m_iI106Handle, suI106Hdr.ulPacketLen, pvBuff);
+            if (enStatus != I106_OK)
+                return 1;
+
+            // Process the TMATS info
+            enStatus = enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
+            if (enStatus != I106_OK) 
+                {
+                fprintf(stderr, " Error processing TMATS record : Status = %d\n", enStatus);
+                return 1;
+                }
+
+            vPrintTmats(&suTmatsInfo, ptOutFile);
+            } // end if TMATS
+
+        // TMATS not first message
+        else
+            {
+            printf("Error - TMATS message not found\n");
+            return 1;
+            }
+
+        return 0;
+        } // end if print TMATS
+
+/*
  * Read messages until error or EOF
  */
 
@@ -303,15 +346,16 @@ int main(int argc, char ** argv)
             if (enStatus != I106_OK)
                 break;
 
+            // If 1553 message then process it
             if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_1553_FMT_1) &&
                 ((iChannel == -1) || (iChannel == (int)suI106Hdr.uChID)))
                 {
 
                 // Make sure our buffer is big enough, size *does* matter
-                if (ulBuffSize < suI106Hdr.ulDataLen+8)
+                if (ulBuffSize < suI106Hdr.ulPacketLen)
                     {
-                    pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
-                    ulBuffSize = suI106Hdr.ulDataLen+8;
+                    pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                    ulBuffSize = suI106Hdr.ulPacketLen;
                     }
 
                 // Read the data buffer
@@ -319,10 +363,7 @@ int main(int argc, char ** argv)
 
                 // Check for data read errors
                 if (enStatus != I106_OK)
-                    {
-//                    suCnt.ulReadErrors++;
                     break;
-                    }
 
                 lMsgs++;
                 if (bVerbose) 
@@ -343,11 +384,16 @@ int main(int argc, char ** argv)
                         if (uDecCnt == 1) 
                             {
   
-                                // Print out the time
-//                                szTime = ctime(&tTime.lTimeMS);
-//                                szTime[19] = '\0';
-//                                iMilliSec = (int)(tTime.sTimeLS * 1000.0 * FFDR_TIME_LSB);
-//                                fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+                            // Print out the time
+
+                            // PROBABLY REALLY OUGHT TO CHECK FOR THAT GOOFY SECONDARY
+                            // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
+                            enI106_Rel2IrigTime(m_iI106Handle,
+                                su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
+                            szTime = ctime(&(time_t)(suTime.ulSecs));
+                            szTime[19] = '\0';
+                            iMilliSec = (int)(suTime.ulFrac / 10000.0);
+                            fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
 
                             // Print out the command word
                             fprintf(ptOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
@@ -456,13 +502,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= Channel Summary =-=-=\n\n");
+    fprintf(ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
 
     // G record
     fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"IRIG 106 Rev - %s\n",psuTmatsInfo->psuFirstGRecord->szIrig106Rev);
-    fprintf(ptOutFile,"Channel  Type          Data Source         \n");
-    fprintf(ptOutFile,"-------  ------------  --------------------\n");
+    fprintf(ptOutFile,"\n");
+    fprintf(ptOutFile,"Channel  Data Source         \n");
+    fprintf(ptOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -481,12 +527,15 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
             // R record data sources
             psuRDataSource = psuRRecord->psuFirstDataSource;
             do  {
-                if (psuRDataSource == NULL) break;
-                iRDsiIndex = psuRDataSource->iDataSourceNum;
-                fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
-                fprintf(ptOutFile,"  %-12s", psuRDataSource->szChannelDataType);
-                fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                fprintf(ptOutFile,"\n");
+                if (psuRDataSource == NULL) 
+                    break;
+                if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
+                    {
+                    iRDsiIndex = psuRDataSource->iDataSourceNum;
+                    fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(ptOutFile,"\n");
+                    }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 
@@ -504,31 +553,33 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
 /* ------------------------------------------------------------------------ */
 
 void vUsage(void)
-  {
-  printf("IDMP1553 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Usage: idmp1553 <input file> <output file> [flags]\n");
-  printf("   <filename> Input/output file names\n");
-  printf("   -v         Verbose\n");
-  printf("   -c ChNum   Channel Number (default all)\n");
-  printf("   -r RT      RT Address(1-30) (default all)\n");
-  printf("   -t T/R     T/R Bit (0=R 1=T) (default all)\n");
-  printf("   -s SA      Subaddress (default all)\n");
-  printf("   -d Num     Dump 1 in 'Num' messages\n");
-  printf("   -i         Dump data as decimal integers\n");
-  printf("   -u         Dump status response\n");
-  printf("                                           \n");
-  printf("The output data fields are:                \n");
-  printf("  Time Bus RT T/R SA WC Errs Data...       \n");
-  printf("                                           \n");
-  printf("Error Bits:                                \n");
-  printf("  0x01    Word Error                       \n");
-  printf("  0x02    Sync Error                       \n");
-  printf("  0x04    Word Count Error                 \n");
-  printf("  0x08    Response Timeout                 \n");
-  printf("  0x10    Format Error                     \n");
-  printf("  0x20    Message Error                    \n");
-  printf("  0x80    RT to RT                         \n");
-  }
+    {
+    printf("IDMP1553 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Usage: idmp1553 <input file> <output file> [flags]\n");
+    printf("   <filename> Input/output file names        \n");
+    printf("   -v         Verbose                        \n");
+    printf("   -c ChNum   Channel Number (default all)   \n");
+    printf("   -r RT      RT Address(1-30) (default all) \n");
+    printf("   -t T/R     T/R Bit (0=R 1=T) (default all)\n");
+    printf("   -s SA      Subaddress (default all)       \n");
+    printf("   -d Num     Dump 1 in 'Num' messages       \n");
+    printf("   -i         Dump data as decimal integers  \n");
+    printf("   -u         Dump status response           \n");
+    printf("                                             \n");
+    printf("   -T         Print TMATS summary and exit   \n");
+    printf("                                             \n");
+    printf("The output data fields are:                  \n");
+    printf("  Time Bus RT T/R SA WC Errs Data...         \n");
+    printf("                                             \n");
+    printf("Error Bits:                                  \n");
+    printf("  0x01    Word Error                         \n");
+    printf("  0x02    Sync Error                         \n");
+    printf("  0x04    Word Count Error                   \n");
+    printf("  0x08    Response Timeout                   \n");
+    printf("  0x10    Format Error                       \n");
+    printf("  0x20    Message Error                      \n");
+    printf("  0x80    RT to RT                           \n");
+    }
 
 
 
