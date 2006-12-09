@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmp1553.c,v $
- $Date: 2006-12-05 12:22:32 $
- $Revision: 1.2 $
+ $Date: 2006-12-09 17:34:40 $
+ $Revision: 1.3 $
 
 */
 
@@ -239,6 +239,14 @@ int main(int argc, char ** argv)
         }
 
   uDecCnt = uDecimation;
+
+/*
+ * Opening banner
+ * --------------
+ */
+
+    fprintf(stderr, "\nIDMP1553 "MAJOR_VERSION"."MINOR_VERSION"\n");
+    fprintf(stderr, "Freeware Copyright (C) 2006 Irig106.org\n\n");
 
 /*
  *  Open file and allocate a buffer for reading data.
@@ -554,7 +562,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
 
 void vUsage(void)
     {
-    printf("IDMP1553 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("\nIDMP1553 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Dump 1553 records from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
     printf("Usage: idmp1553 <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");

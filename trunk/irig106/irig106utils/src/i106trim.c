@@ -37,8 +37,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106trim.c,v $
- $Date: 2006-11-20 04:34:21 $
- $Revision: 1.4 $
+ $Date: 2006-12-09 17:33:41 $
+ $Revision: 1.5 $
 
   ==========================================================================*/
 
@@ -181,6 +181,14 @@ int main (int argc, char *argv[])
 
             } /* end command line arg switch */
         } /* end for all arguments */
+
+/*
+ * Opening banner
+ * --------------
+ */
+
+    fprintf(stderr, "\nI106TRIM "MAJOR_VERSION"."MINOR_VERSION"\n");
+    fprintf(stderr, "Freeware Copyright (C) 2006 Irig106.org\n\n");
 
 /*
  * Open the input file and get things setup
@@ -463,14 +471,16 @@ int iFindFirstTime(int iI106Handle)
 /* ------------------------------------------------------------------------ */
 
 void vUsage(void)
-  {
-  printf("I106TRIM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
-  printf("  +hh:mm:ss - Start copy time\n");
-  printf("  -hh:mm:ss - Stop copy time\n");
-  printf("Or:    fftrim <infile> to get stats\n");
-  return;
-  }
+    {
+    printf("\nI106TRIM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Trim a Ch 10 data file based on time\n");
+    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
+    printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
+    printf("  +hh:mm:ss - Start copy time\n");
+    printf("  -hh:mm:ss - Stop copy time\n");
+    printf("Or:    fftrim <infile> to get stats\n");
+    return;
+    }
 
 
 

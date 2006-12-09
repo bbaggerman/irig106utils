@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmptmat.c,v $
- $Date: 2006-12-04 12:58:00 $
- $Revision: 1.4 $
+ $Date: 2006-12-09 17:33:41 $
+ $Revision: 1.5 $
 
  ****************************************************************************/
 
@@ -175,27 +175,25 @@ int main(int argc, char ** argv)
         bChannelOutput = bTRUE;
 
 /*
+ * Opening banner
+ * --------------
+ */
+
+    fprintf(stderr, "\nIDMPTMAT "MAJOR_VERSION"."MINOR_VERSION"\n");
+    fprintf(stderr, "Freeware Copyright (C) 2006 Irig106.org\n\n");
+
+/*
  * Open file and get everything init'ed
  * ------------------------------------
  */
 
-
-/*
- *  Open file and allocate a buffer for reading data.
- */
-
+    // Open file and allocate a buffer for reading data.
     enStatus = enI106Ch10Open(&iI106Ch10Handle, szInFile, I106_READ);
     if (enStatus != I106_OK)
         {
         fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
         return 1;
         }
-
-
-/*
- * Open the output file
- */
-
 
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
@@ -434,15 +432,16 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
 /* ------------------------------------------------------------------------ */
 
 void vUsage(void)
-  {
-  printf("irig106.org - IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Read and output TMATS record from a Ch 10 data file\n");
-  printf("Usage: idmptmat <infile> <outfile> <flags>\n");
-  printf("  -c      Output channel summary format (default)\n");
-  printf("  -t      Output tree view format\n");
-  printf("  -r      Output raw TMATS\n");
-  return;
-  }
+    {
+    printf("\nIDMPTMAT - IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Read and output TMATS record from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
+    printf("Usage: idmptmat <infile> <outfile> <flags>\n");
+    printf("  -c      Output channel summary format (default)\n");
+    printf("  -t      Output tree view format\n");
+    printf("  -r      Output raw TMATS\n");
+    return;
+    }
 
 
 
