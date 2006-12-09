@@ -1,6 +1,6 @@
 /*==========================================================================
 
-  i106stat - Generate histogram-like statistics on a Irig 106 data file
+ i106stat - Generate histogram-like statistics on a Irig 106 data file
 
  Copyright (c) 2006 Irig106.org
 
@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-11-30 02:42:59 $
- $Revision: 1.7 $
+ $Date: 2006-12-09 17:31:59 $
+ $Revision: 1.8 $
 
  ****************************************************************************/
 
@@ -70,66 +70,45 @@
 #define bFALSE  (1==0)
 #endif
 
-
-#define MAX_1553_BUSES             8
-#define TOTAL_1553_STAT_BUFF_IDX   (0x1000L * MAX_1553_BUSES)
-
-#define CHANTYPE_UNKNOWN        0
-#define CHANTYPE_PCM            1
-#define CHANTYPE_ANALOG         2
-#define CHANTYPE_DISCRETE       3
-#define CHANTYPE_IRIG_TIME      4
-#define CHANTYPE_VIDEO          5
-#define CHANTYPE_UART           6
-#define CHANTYPE_1553           7
-#define CHANTYPE_ARINC_429      8
-#define CHANTYPE_MESSAGE_DATA   9
-#define CHANTYPE_IMAGE DATA    10
-
-
 /*
  * Data structures
  * ---------------
  */
 
+
 /* These hold the number of messages of each type for the histogram. */
 
-// Message counts
+// 1553 channel counts
+typedef struct
+    {
+    unsigned long       ulTotalIrigMsgs;
+    unsigned long       ulTotalBusMsgs;
+    unsigned long       aulMsgs[0x4000];
+    unsigned long       aulErrs[0x4000];
+    unsigned long       ulErr1553Timeout;
+    int                 bRT2RTFound;
+    } SuChanInfo1553;
+
+// Per channel statistics
 typedef struct
   {
-    unsigned long * pul1553Msgs;
-    unsigned long * pul1553Errs;
-    unsigned long   ulErrTimeout;
-    unsigned long   ulUserDefined;
-    unsigned long   ulIrigTime;
-    unsigned long   ulAnalog;
-    unsigned long   ulTMATS;
-    unsigned long   ulEvents;
-    unsigned long   ulIndex;
-    unsigned long   ulPCM;
-    unsigned long   ulMonitor;
-    unsigned long   ulMPEG2;
-    unsigned long   ulUART;
-    unsigned long   ulOther;
-    unsigned long   ulTotal;
-
-    long            lFileStartTime;
-    long            lStartTime;
-    long            lStopTime;
-    unsigned char   abyFileStartTime[6];
-    unsigned char   abyStartTime[6];
-    unsigned char   abyStopTime[6];
-    int             bLogRT2RT;
-    int             bRT2RTFound;
-    unsigned long   ulReadErrors;
-    } SuCounts;
-
-// Channel ID info
-typedef struct 
-    {
-    unsigned char       uChanType;
-    unsigned char       uChanIdx;
-    } SuChannelDecode;
+    unsigned int        iChanID;
+    int                 iPrevSeqNum;
+    unsigned long       ulSeqNumError;
+    unsigned char       szChanType[32];
+    unsigned char       szChanName[32];
+    SuChanInfo1553    * psu1553Info;
+    unsigned long       ulUserDefined;
+    unsigned long       ulIrigTime;
+    unsigned long       ulAnalog;
+    unsigned long       ulTMATS;
+    unsigned long       ulEvents;
+    unsigned long       ulIndex;
+    unsigned long       ulPCM;
+    unsigned long       ulMPEG2;
+    unsigned long       ulUART;
+    unsigned long       ulOther;
+    } SuChanInfo;
 
 
 /*
@@ -137,19 +116,17 @@ typedef struct
  * -----------
  */
 
-int                     m_iI106Handle;
-SuChannelDecode         m_asuChanInfo[0x10000];
+int                 m_bLogRT2RT;
+int                 m_bVerbose;
 
 /*
  * Function prototypes
  * -------------------
  */
 
-void     vResetCounts(SuCounts * psuCnt);
-void     vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile);
+void     vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile);
 void     vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
-void     vProcessTmats(SuTmatsInfo * psuTmatsInfo);
-unsigned uGet1553ChanID(unsigned uChanIdx);
+void     vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[]);
 void     vUsage(void);
 
 
@@ -158,56 +135,65 @@ void     vUsage(void);
 int main(int argc, char ** argv)
     {
 
+    // Array of pointers to the SuChanInfo structure
+    static SuChanInfo     * apsuChanInfo[0x10000];
+
+    unsigned char           abyFileStartTime[6];
+    unsigned char           abyStartTime[6];
+    unsigned char           abyStopTime[6];
+    int                     bFoundFileStartTime = bFALSE;
+    int                     bFoundDataStartTime = bFALSE;
+    unsigned long           ulReadErrors;
+    unsigned long           ulTotal;
+
+    FILE                  * ptOutFile;        // Output file handle
+    int                     hI106In;
     char                    szInFile[80];     // Input file name
     char                    szOutFile[80];    // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;        // Output file handle
-    int                     bVerbose;
-    int                     bFoundFileStartTime = bFALSE;
-    int                     bFoundDataStartTime = bFALSE;
     unsigned short          usPackedIdx;
     unsigned long           ulBuffSize = 0L;
     unsigned long           ulReadSize;
 
-    unsigned char           uChanIdx;
+    unsigned int            uChanIdx;
 
-//    SuIrig106Time           suIrigTime;
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
     Su1553F1_CurrMsg        su1553Msg;
     SuTmatsInfo             suTmatsInfo;
+    SuIrig106Time           suIrigTime;
+    struct tm             * psuTmTime;
+    char                    szTime[50];
+    char                  * szTimeFmt = "%m/%d/%Y %H:%M:%S";
 
     unsigned char         * pvBuff = NULL;
 
-    SuCounts                suCnt;
-
-
-/* Make sure things stay on UTC */
+// Make sure things stay on UTC
 
     putenv("TZ=GMT0");
     tzset();
 
 /*
- *  Allocate memory for 1553 histogram.
+ * Initialize the channel info array pointers to all NULL
  */
 
-    suCnt.pul1553Errs = NULL;
-    suCnt.pul1553Msgs = NULL;
-    vResetCounts(&suCnt);
+    memset(apsuChanInfo, 0, sizeof(apsuChanInfo));
+    ulTotal      = 0L;
+    ulReadErrors = 0L;
 
 /*
  * Process the command line arguements
  */
 
-    if (argc < 2) {
-    vUsage();
-    return 1;
-    }
+    if (argc < 2) 
+        {
+        vUsage();
+        return 1;
+        }
 
-    bVerbose          = bFALSE;               // No verbosity
-    suCnt.bLogRT2RT   = bFALSE;               // Don't keep track of RT to RT
-    suCnt.bRT2RTFound = bFALSE;
-    szInFile[0]  = '\0';
+    m_bVerbose    = bFALSE;               // No verbosity
+    m_bLogRT2RT   = bFALSE;               // Don't keep track of RT to RT
+    szInFile[0] = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
 
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
@@ -222,11 +208,11 @@ int main(int argc, char ** argv)
                     {
 
                     case 'r' :                   // Log RT to RT
-                        suCnt.bLogRT2RT = bTRUE;
+                        m_bLogRT2RT = bTRUE;
                         break;
 
                     case 'v' :                   // Verbose switch
-                        bVerbose = bTRUE;
+                        m_bVerbose = bTRUE;
                         break;
 
                     default :
@@ -250,32 +236,33 @@ int main(int argc, char ** argv)
         }
 
 /*
- * Open file and get everything init'ed
+ * Opening banner
+ * --------------
+ */
+
+    fprintf(stderr, "\nI106STAT "MAJOR_VERSION"."MINOR_VERSION"\n");
+    fprintf(stderr, "Freeware Copyright (C) 2006 Irig106.org\n\n");
+
+/*
+ * Opens file and get everything init'ed
  * ------------------------------------
  */
 
 
-/*
- *  Open file and allocate a buffer for reading data.
- */
-
-    enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
+    // Open file and allocate a buffer for reading data.
+    enStatus = enI106Ch10Open(&hI106In, szInFile, I106_READ);
     if (enStatus != I106_OK)
         {
         fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
         return 1;
         }
 
-    enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
+    enStatus = enI106_SyncTime(hI106In, bFALSE, 0);
     if (enStatus != I106_OK)
         {
         fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
         return 1;
         }
-
-/*
- * Open the output file
- */
 
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
@@ -295,7 +282,7 @@ int main(int argc, char ** argv)
         }
 
 
-  printf("Computing histogram...\n");
+    fprintf(stderr, "Computing histogram...\n");
 
 
 /*
@@ -308,21 +295,20 @@ int main(int argc, char ** argv)
         {
 
         // Read the next header
-        enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
+        enStatus = enI106Ch10ReadNextHeader(hI106In, &suI106Hdr);
 
         // Setup a one time loop to make it easy to break out on error
         do
             {
             if (enStatus == I106_EOF)
                 {
-                fprintf(stderr, "End of file\n");
                 break;
                 }
 
             // Check for header read errors
             if (enStatus != I106_OK)
                 {
-                suCnt.ulReadErrors++;
+                ulReadErrors++;
                 break;
                 }
 
@@ -335,18 +321,38 @@ int main(int argc, char ** argv)
 
             // Read the data buffer
             ulReadSize = ulBuffSize;
-            enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
+            enStatus = enI106Ch10ReadData(hI106In, ulBuffSize, pvBuff);
 
             // Check for data read errors
             if (enStatus != I106_OK)
                 {
-                suCnt.ulReadErrors++;
+                ulReadErrors++;
                 break;
                 }
 
-            suCnt.ulTotal++;
-            if (bVerbose) 
-                fprintf(stderr, "%8.8ld Messages \r",suCnt.ulTotal);
+            // If this is a new channel, malloc some memory for counts and
+            // set the pointer in the channel info array to it.
+            if (apsuChanInfo[suI106Hdr.uChID] == NULL)
+                {
+                apsuChanInfo[suI106Hdr.uChID] = (SuChanInfo *)malloc(sizeof(SuChanInfo));
+                memset(apsuChanInfo[suI106Hdr.uChID], 0, sizeof(SuChanInfo));
+                apsuChanInfo[suI106Hdr.uChID]->iChanID = suI106Hdr.uChID;
+                // Now save channel type and name
+                if (suI106Hdr.uChID == 0)
+                    {
+                    strcpy(apsuChanInfo[suI106Hdr.uChID]->szChanType, "RESERVED");
+                    strcpy(apsuChanInfo[suI106Hdr.uChID]->szChanName, "SYSTEM");
+                    }
+                else
+                    {
+                    strcpy(apsuChanInfo[suI106Hdr.uChID]->szChanType, "UNKNOWN");
+                    strcpy(apsuChanInfo[suI106Hdr.uChID]->szChanName, "UNKNOWN");
+                    }
+                }
+
+            ulTotal++;
+            if (m_bVerbose) 
+                fprintf(stderr, "%8.8ld Messages \r",ulTotal);
 
             // Save data start and stop times
             if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS) &&
@@ -354,12 +360,12 @@ int main(int argc, char ** argv)
                 {
                 if (bFoundDataStartTime == bFALSE) 
                     {
-                    memcpy((char *)suCnt.abyStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+                    memcpy((char *)abyStartTime, (char *)suI106Hdr.aubyRefTime, 6);
                     bFoundDataStartTime = bTRUE;
                     }
                 else
                     {
-                    memcpy((char *)suCnt.abyStopTime, (char *)suI106Hdr.aubyRefTime, 6);
+                    memcpy((char *)abyStopTime, (char *)suI106Hdr.aubyRefTime, 6);
                     }
                 } // end if data message
 
@@ -368,46 +374,53 @@ int main(int argc, char ** argv)
                 {
 
                 case I106CH10_DTYPE_USER_DEFINED :      // 0x00
-                    suCnt.ulUserDefined++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulUserDefined++;
                     break;
 
                 case I106CH10_DTYPE_TMATS :             // 0x01
-                    suCnt.ulTMATS++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulTMATS++;
 
                     // Only decode the first TMATS record
-                    if (suCnt.ulTMATS != 0)
+                    if (apsuChanInfo[suI106Hdr.uChID]->ulTMATS != 0)
                         {
                         // Save file start time
-                        memcpy((char *)&suCnt.abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
+                        memcpy((char *)&abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
 
                         // Process TMATS info for later use
                         enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
                         if (enStatus != I106_OK) 
                             break;
-                        vProcessTmats(&suTmatsInfo);
+                        vProcessTmats(&suTmatsInfo, apsuChanInfo);
                         }
                     break;
 
                 case I106CH10_DTYPE_RECORDING_EVENT :   // 0x02
-                    suCnt.ulEvents++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulEvents++;
                     break;
 
                 case I106CH10_DTYPE_RECORDING_INDEX :   // 0x03
-                    suCnt.ulIndex++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulIndex++;
                     break;
 
                 case I106CH10_DTYPE_PCM :               // 0x09
-                    suCnt.ulPCM++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulPCM++;
                     break;
 
                 case I106CH10_DTYPE_IRIG_TIME :         // 0x11
-                    suCnt.ulIrigTime++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulIrigTime++;
                     break;
 
                 case I106CH10_DTYPE_1553_FMT_1 :        // 0x19
 
-                    uChanIdx = m_asuChanInfo[suI106Hdr.ubyDataType].uChanIdx;
-    //              if (m_asuChanInfo[suI106Hdr.ubyDataType].uChanType != CHANTYPE_1553)
+                    // If first 1553 message for this channel, setup the 1553 counts
+                    if (apsuChanInfo[suI106Hdr.uChID]->psu1553Info == NULL)
+                        {
+                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info = 
+                            malloc(sizeof(SuChanInfo1553));
+                        memset(apsuChanInfo[suI106Hdr.uChID]->psu1553Info, 0x00, sizeof(SuChanInfo1553));
+                        }
+
+                    apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalIrigMsgs++;
 
                     // Step through all 1553 messages
                     enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
@@ -415,20 +428,16 @@ int main(int argc, char ** argv)
                         {
 
                         // Update message count
-                        usPackedIdx  = 0;
-                        usPackedIdx |=  uChanIdx                          << 11;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0xF800) >> 5;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x0400) >> 5;
-                        usPackedIdx |= (*(su1553Msg.puCmdWord1) & 0x03E0) >> 5;
-                        suCnt.pul1553Msgs[usPackedIdx]++;
-                        suCnt.ulMonitor++;
+                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalBusMsgs++;
+                        usPackedIdx = (su1553Msg.psuCmdWord1->uValue >> 5) & 0x3FFF;
+                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulMsgs[usPackedIdx]++;
 
                         // Update the error counts
                         if (su1553Msg.psu1553Hdr->bMsgError != 0) 
-                            suCnt.pul1553Errs[usPackedIdx]++;
+                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulErrs[usPackedIdx]++;
 
                         if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
-                            suCnt.ulErrTimeout++;
+                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulErr1553Timeout++;
 
                         // Get the next 1553 message
                         enStatus = enI106_Decode_Next1553F1(&su1553Msg);
@@ -436,34 +445,30 @@ int main(int argc, char ** argv)
 
                         // If logging RT to RT then do it for second command word
                         if (su1553Msg.psu1553Hdr->bRT2RT == 1)
-                            suCnt.bRT2RTFound = bTRUE;
+                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->bRT2RTFound = bTRUE;
 
-                        if (suCnt.bLogRT2RT==bTRUE) 
+                        if (m_bLogRT2RT==bTRUE) 
                             {
-                            usPackedIdx  = 0;
-                            usPackedIdx |=  uChanIdx                          << 11;
-                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0xF800) >> 5;
-                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x0400) >> 5;
-                            usPackedIdx |= (*(su1553Msg.puCmdWord2) & 0x03E0) >> 5;
-                            suCnt.pul1553Msgs[usPackedIdx]++;
+                            usPackedIdx = (su1553Msg.psuCmdWord2->uValue >> 5) & 0x3FFF;
+                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulMsgs[usPackedIdx]++;
                         } // end if logging RT to RT
 
                     break;
 
                 case I106CH10_DTYPE_ANALOG :            // 0x21
-                    suCnt.ulAnalog++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulAnalog++;
                     break;
 
                 case I106CH10_DTYPE_MPEG2 :             // 0x40
-                    suCnt.ulMPEG2++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulMPEG2++;
                     break;
 
                 case I106CH10_DTYPE_UART :              // 0x50
-                    suCnt.ulUART++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulUART++;
                     break;
 
                 default:
-                    suCnt.ulOther++;
+                    apsuChanInfo[suI106Hdr.uChID]->ulOther++;
                     break;
 
                 } // end switch on message type
@@ -473,7 +478,6 @@ int main(int argc, char ** argv)
         // If EOF break out of main read loop
         if (enStatus == I106_EOF)
             {
-            fprintf(stderr, "End of file\n");
             break;
             }
 
@@ -485,8 +489,35 @@ int main(int argc, char ** argv)
  * ---------------------------------------
  */
 
-    vPrintTmats(&suTmatsInfo, ptOutFile);
-    vPrintCounts(&suCnt, ptOutFile);
+//    vPrintTmats(&suTmatsInfo, ptOutFile);
+
+    fprintf(ptOutFile,"\n=-=-= Message Totals by Channel and Type =-=-=\n\n");
+    for (uChanIdx=0; uChanIdx<0x1000; uChanIdx++)
+        {
+        if (apsuChanInfo[uChanIdx] != NULL)
+            {
+            vPrintCounts(apsuChanInfo[uChanIdx], ptOutFile);
+            }
+        }
+
+    fprintf(ptOutFile,"=-=-= File Time Summary =-=-=\n\n");
+
+    enI106_Rel2IrigTime(hI106In, abyFileStartTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"File Start %s\n",  szTime);
+
+    enI106_Rel2IrigTime(hI106In, abyStartTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Start %s\n",  szTime);
+
+    enI106_Rel2IrigTime(hI106In, abyStopTime, &suIrigTime);
+    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
+    strftime(szTime, 50, szTimeFmt, psuTmTime);
+    fprintf(ptOutFile,"Data Stop  %s\n\n",  szTime);
+
+    fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", ulTotal);
 
 /*
  *  Free dynamic memory.
@@ -504,143 +535,82 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vResetCounts(SuCounts * psuCnt)
-{
-
-  // Free 1553 counts memory
-  if (psuCnt->pul1553Msgs != NULL)
-    free(psuCnt->pul1553Msgs);
-  if (psuCnt->pul1553Errs != NULL)
-    free(psuCnt->pul1553Errs);
-
-  // Clear out the counts
-  memset(psuCnt, 0x00, sizeof(SuCounts));
-
-  psuCnt->pul1553Msgs = calloc(TOTAL_1553_STAT_BUFF_IDX, sizeof (unsigned long));
-  memset(psuCnt->pul1553Msgs, 0x00, 0x3FFFL*sizeof (unsigned long));
-
-  psuCnt->pul1553Errs = calloc(TOTAL_1553_STAT_BUFF_IDX, sizeof (unsigned long));
-  memset(psuCnt->pul1553Errs, 0x00, 0x3FFFL*sizeof (unsigned long));
-  
-  assert(psuCnt->pul1553Msgs != NULL);
-  assert(psuCnt->pul1553Errs != NULL);
-
-  return;
-}
-
-
-
-/* ------------------------------------------------------------------------ */
-
-void vPrintCounts(SuCounts * psuCnt, FILE * ptOutFile)
+void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
     {
     long            lMsgIdx;
-    unsigned        uChanID;
-    struct tm     * psuTmTime;
-    char            szTime[50];
-    char          * szTimeFmt = "%m/%d/%Y %H:%M:%S";
-    SuIrig106Time   suIrigTime;
 
-//    uint64_t        llFileStartTime;
-//    uint64_t        llStartTime;
-//    uint64_t        llStopTime;
+    // Make Channel ID line lead-in string
+    fprintf(ptOutFile,"ChanID %3d : %s : %s\n", 
+        psuChanInfo->iChanID, psuChanInfo->szChanType, psuChanInfo->szChanName);
 
-    fprintf(ptOutFile,"\n=-=-= Message Totals by Type =-=-=\n\n");
+    if (psuChanInfo->ulTMATS != 0)
+        fprintf(ptOutFile,"    TMATS             %10lu\n",   psuChanInfo->ulTMATS);
 
-/*
-  if (psuCnt->ulHeader != 0)
-    fprintf(ptOutFile,"Headers:          %10lu\n", psuCnt->ulHeader);
+    if (psuChanInfo->ulEvents != 0)
+        fprintf(ptOutFile,"    Events            %10lu\n",   psuChanInfo->ulEvents);
 
-  if (psuCnt->ulEvent != 0)
-    fprintf(ptOutFile,"Events:           %10lu\n", psuCnt->ulEvent);
-*/
+    if (psuChanInfo->ulIndex != 0)
+        fprintf(ptOutFile,"    Index             %10lu\n",   psuChanInfo->ulIndex);
 
-    if (psuCnt->ulMonitor != 0) 
+    if (psuChanInfo->ulIrigTime != 0)
+        fprintf(ptOutFile,"    IRIG Time         %10lu\n",   psuChanInfo->ulIrigTime);
+
+    if ((psuChanInfo->psu1553Info != NULL)  &&
+        (psuChanInfo->psu1553Info->ulTotalBusMsgs != 0))
         {
-        assert(psuCnt->pul1553Msgs != NULL);
-        assert(psuCnt->pul1553Errs != NULL);
-        fprintf(ptOutFile,"1553 :            %10lu\n", psuCnt->ulMonitor);
 
-        for (lMsgIdx=0; lMsgIdx<TOTAL_1553_STAT_BUFF_IDX; lMsgIdx++) 
+        // Loop through all RT, TR, and SA combinations
+        for (lMsgIdx=0; lMsgIdx<0x4000; lMsgIdx++) 
             {
-            if (psuCnt->pul1553Msgs[lMsgIdx] != 0) 
+            if (psuChanInfo->psu1553Info->aulMsgs[lMsgIdx] != 0) 
                 {
-                uChanID = uGet1553ChanID((lMsgIdx >> 11) & 0x0007);
-                fprintf(ptOutFile,"    ChanID %d  RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
-                    uChanID,
+                fprintf(ptOutFile,"    RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
                     (lMsgIdx >>  6) & 0x001f,
                     (lMsgIdx >>  5) & 0x0001 ? 'T' : 'R',
                     (lMsgIdx      ) & 0x001f,
-                    psuCnt->pul1553Msgs[lMsgIdx],
-                    psuCnt->pul1553Errs[lMsgIdx]);
+                    psuChanInfo->psu1553Info->aulMsgs[lMsgIdx],
+                    psuChanInfo->psu1553Info->aulErrs[lMsgIdx]);
                 } // end if count not zero
-            } // end for each RT
+            } // end for each combination
 
-//      fprintf(ptOutFile,"  Manchester Errors :   %10lu\n", psuCnt->ulErrManchester);
-//      fprintf(ptOutFile,"  Parity Errors     :   %10lu\n", psuCnt->ulErrParity);
-//      fprintf(ptOutFile,"  Overrun Errors    :   %10lu\n", psuCnt->ulErrOverrun);
-        fprintf(ptOutFile,"    Timeout Errors    :   %10lu\n", psuCnt->ulErrTimeout);
+//      fprintf(ptOutFile,"  Manchester Errors :   %10lu\n", psuChanInfo->ulErrManchester);
+//      fprintf(ptOutFile,"  Parity Errors     :   %10lu\n", psuChanInfo->ulErrParity);
+//      fprintf(ptOutFile,"  Overrun Errors    :   %10lu\n", psuChanInfo->ulErrOverrun);
+//      fprintf(ptOutFile,"  Timeout Errors    :   %10lu\n", psuChanInfo->ulErrTimeout);
 
-        if (psuCnt->bRT2RTFound == bTRUE) 
+        if (psuChanInfo->psu1553Info->bRT2RTFound == bTRUE) 
             {
             fprintf(ptOutFile,"\n  Warning - RT to RT transfers found in the data\n");
-            if (psuCnt->bLogRT2RT == bTRUE)
-                fprintf(ptOutFile,"  Message total is NOT the sum of individual RT totals\n");
+            if (m_bLogRT2RT == bTRUE)
+                fprintf(ptOutFile,"    Message total is NOT the sum of individual RT totals\n");
             else 
-                fprintf(ptOutFile,"  Some transmit RTs may not be shown\n");
+                fprintf(ptOutFile,"    Some transmit RTs may not be shown\n");
             } // end if RT to RT
 
+        fprintf(ptOutFile,"    Totals - %ld Message in %ld IRIG Records\n",
+            psuChanInfo->psu1553Info->ulTotalBusMsgs,
+            psuChanInfo->psu1553Info->ulTotalIrigMsgs);
         } // end if 1553 messages
 
-    if (psuCnt->ulUserDefined != 0)
-        fprintf(ptOutFile,"User Defined      %10lu\n",   psuCnt->ulUserDefined);
+    if (psuChanInfo->ulPCM != 0)
+        fprintf(ptOutFile,"    PCM               %10lu\n",   psuChanInfo->ulPCM);
 
-    if (psuCnt->ulEvents != 0)
-        fprintf(ptOutFile,"Events            %10lu\n",   psuCnt->ulEvents);
+    if (psuChanInfo->ulAnalog != 0)
+        fprintf(ptOutFile,"    Analog            %10lu\n",   psuChanInfo->ulAnalog);
 
-    if (psuCnt->ulIndex != 0)
-        fprintf(ptOutFile,"Index             %10lu\n",   psuCnt->ulIndex);
+    if (psuChanInfo->ulMPEG2 != 0)
+        fprintf(ptOutFile,"    MPEG Video        %10lu\n",   psuChanInfo->ulMPEG2);
 
-    if (psuCnt->ulPCM != 0)
-        fprintf(ptOutFile,"PCM               %10lu\n",   psuCnt->ulPCM);
+    if (psuChanInfo->ulUART != 0)
+        fprintf(ptOutFile,"    UART              %10lu\n",   psuChanInfo->ulUART);
 
-    if (psuCnt->ulIrigTime != 0)
-        fprintf(ptOutFile,"IRIG Time         %10lu\n",   psuCnt->ulIrigTime);
+    if (psuChanInfo->ulUserDefined != 0)
+        fprintf(ptOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
 
-    if (psuCnt->ulAnalog != 0)
-        fprintf(ptOutFile,"Analog            %10lu\n",   psuCnt->ulAnalog);
+    if (psuChanInfo->ulOther != 0)
+        fprintf(ptOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
 
-    if (psuCnt->ulMPEG2 != 0)
-        fprintf(ptOutFile,"MPEG Video        %10lu\n",   psuCnt->ulMPEG2);
-
-    if (psuCnt->ulUART != 0)
-        fprintf(ptOutFile,"UART              %10lu\n",   psuCnt->ulUART);
-
-    if (psuCnt->ulTMATS != 0)
-        fprintf(ptOutFile,"TMATS             %10lu\n",   psuCnt->ulTMATS);
-
-    if (psuCnt->ulOther != 0)
-        fprintf(ptOutFile,"Other messages    %10lu\n",   psuCnt->ulOther);
-
-    fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", psuCnt->ulTotal);
-
-    fprintf(ptOutFile,"=-=-= File Time Summary =-=-=\n\n");
-
-    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyFileStartTime, &suIrigTime);
-    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"File Start %s\n",  szTime);
-
-    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyStartTime, &suIrigTime);
-    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Start %s\n",  szTime);
-
-    enI106_Rel2IrigTime(m_iI106Handle, psuCnt->abyStopTime, &suIrigTime);
-    psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
-    strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Stop  %s\n\n",  szTime);
-
+    fprintf(ptOutFile,"\n",   psuChanInfo->ulOther);
     return;
     }
 
@@ -709,22 +679,14 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
 
 /* ------------------------------------------------------------------------ */
 
-void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
+void vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[])
     {
-    unsigned            uArrayIdx;
-    unsigned char       u1553ChanIdx;
+//    unsigned            uArrayIdx;
+//    unsigned char       u1553ChanIdx;
     SuRRecord         * psuRRecord;
     SuRDataSource     * psuRDataSrc;
 
-    // Initialize the message mapping array
-    for (uArrayIdx=0; uArrayIdx<0x10000; uArrayIdx++)
-        {
-        m_asuChanInfo[uArrayIdx].uChanType = CHANTYPE_UNKNOWN;
-        m_asuChanInfo[uArrayIdx].uChanIdx  = 0;
-        }
-
-    // Map IRIG106 messages and channels
-    u1553ChanIdx = 0;
+    // Find channels mentioned in TMATS record
     psuRRecord   = psuTmatsInfo->psuFirstRRecord;
     while (psuRRecord != NULL)
         {
@@ -732,12 +694,18 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
         psuRDataSrc = psuRRecord->psuFirstDataSource;
         while (psuRDataSrc != NULL)
             {
-            // See if 1553 channel data type
-            if (strcasecmp(psuRDataSrc->szChannelDataType,"1553IN") == 0)
+            // Make sure a message count structure exists
+            if (apsuChanInfo[psuRDataSrc->iTrackNumber] == NULL)
                 {
-                m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanType = CHANTYPE_1553;
-                m_asuChanInfo[psuRDataSrc->iTrackNumber].uChanIdx  = u1553ChanIdx++;
-                } // end if 1553 channel type
+// SOMEDAY PROBABLY WANT TO HAVE DIFFERENT COUNT STRUCTURES FOR EACH CHANNEL TYPE
+                apsuChanInfo[psuRDataSrc->iTrackNumber] = malloc(sizeof(SuChanInfo));
+                memset(apsuChanInfo[psuRDataSrc->iTrackNumber], 0, sizeof(SuChanInfo));
+                apsuChanInfo[psuRDataSrc->iTrackNumber]->iChanID = psuRDataSrc->iTrackNumber;
+                }
+
+            // Now save channel type and name
+            strcpy(apsuChanInfo[psuRDataSrc->iTrackNumber]->szChanType, psuRDataSrc->szChannelDataType);
+            strcpy(apsuChanInfo[psuRDataSrc->iTrackNumber]->szChanName, psuRDataSrc->szDataSourceID);
 
             // Get the next R record data source
             psuRDataSrc = psuRDataSrc->psuNextRDataSource;
@@ -755,31 +723,15 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo)
 
 /* ------------------------------------------------------------------------ */
 
-unsigned uGet1553ChanID(unsigned uChanIdx)
-    {
-    unsigned    uChanID;
-
-    for (uChanID=0; uChanID <0x10000; uChanID++)
-        {
-        if ((m_asuChanInfo[uChanID].uChanType == CHANTYPE_1553) &&
-            (m_asuChanInfo[uChanID].uChanIdx  == uChanIdx))
-            break;
-        } // end for all channel id's
-
-    return uChanID;
-    }
-
-
-
-/* ------------------------------------------------------------------------ */
-
 void vUsage(void)
-  {
-  printf("I106STAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Usage: i106stat <input file> <output file> [flags]\n");
-  printf("   <filename> Input/output file names\n");
-  printf("   -r         Log both sides of RT to RT transfers\n");
-  printf("   -v         Verbose\n");
-  }
+    {
+    printf("\nI106STAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Print totals by channel and message type from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
+    printf("Usage: i106stat <input file> <output file> [flags]\n");
+    printf("   <filename> Input/output file names\n");
+    printf("   -r         Log both sides of RT to RT transfers\n");
+    printf("   -v         Verbose\n");
+    }
 
 
