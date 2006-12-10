@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmp1553.c,v $
- $Date: 2006-12-09 17:34:40 $
- $Revision: 1.3 $
+ $Date: 2006-12-10 01:14:40 $
+ $Revision: 1.4 $
 
 */
 
@@ -93,7 +93,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
-void vPrintTmats(void * pvBuff, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
 void vUsage(void);
 
 
@@ -398,7 +398,7 @@ int main(int argc, char ** argv)
                             // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
                             enI106_Rel2IrigTime(m_iI106Handle,
                                 su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
-                            szTime = ctime(&(time_t)(suTime.ulSecs));
+                            szTime = ctime((time_t *)&suTime.ulSecs);
                             szTime[19] = '\0';
                             iMilliSec = (int)(suTime.ulFrac / 10000.0);
                             fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
