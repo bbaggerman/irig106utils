@@ -1,0 +1,91 @@
+==================
+IRIG 106 Utilities
+==================
+
+Copyright (C) 2006 Irig106.org
+
+$RCSfile: i106utils.txt,v $
+$Date: 2006-12-10 16:22:32 $
+$Revision: 1.1 $
+
+Introduction
+------------
+
+These programs are relatively simple utility programs for reading and
+manipulating IRIG 106 format data files.  They are run from a command line
+and are invoked with various command line parameters.  Run just the command
+with no parameters to get a brief summary of available command line parameters.
+
+
+I106STAT
+--------
+
+Generate a summary of data channels and message types found in an IRIG 106
+data file.
+
+Usage: i106stat <input file> <output file> [flags]
+   <filename> Input/output file names
+   -r         Log both sides of RT to RT transfers
+   -v         Verbose
+
+
+I106TRIM
+--------
+
+Trim a data file based on start and/or stop time. It is assumed the day is the
+same as the starting day.  If the stop time is less than the start time, it is
+assumed that the time spans midnight. In this case stop time is the next day.
+
+There are some new requirements for modifying or adding TMATS records when
+rewriting data files. This utility makes no attempt to modify TMATS and so
+technically my result in a non-IRIG106 compliant data file.
+
+Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]
+  +hh:mm:ss - Start copy time
+  -hh:mm:ss - Stop copy time
+Or:    fftrim <infile> to get stats
+
+
+IDMPTMATS
+---------
+
+Read and print out the TMATS record in various formats
+
+Usage: idmptmat <infile> <outfile> <flags>
+  -c      Output channel summary format (default)
+  -t      Output tree view format
+  -r      Output raw TMATS
+
+
+IDMP1553
+--------
+
+Read and dump 1553 messages in a humanly readable format. With no command line
+parameters, all 1553 messages are dumped.  Output can be filtered by Channel ID, 
+RT number, T/R bit, and Subaddress number.  Output can be further limited by
+a decimation factor, useful for thing like INS data.
+
+Usage: idmp1553 <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -r RT      RT Address(1-30) (default all)
+   -t T/R     T/R Bit (0=R 1=T) (default all)
+   -s SA      Subaddress (default all)
+   -d Num     Dump 1 in 'Num' messages
+   -i         Dump data as decimal integers
+   -u         Dump status response
+
+   -T         Print TMATS summary and exit
+
+The output data fields are:
+  Time Bus RT T/R SA WC Errs Data...
+
+Error Bits:
+  0x01    Word Error
+  0x02    Sync Error
+  0x04    Word Count Error
+  0x08    Response Timeout
+  0x10    Format Error
+  0x20    Message Error
+  0x80    RT to RT
