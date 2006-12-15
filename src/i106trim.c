@@ -37,17 +37,15 @@
  Created by Bob Baggerman
 
  $RCSfile: i106trim.c,v $
- $Date: 2006-12-09 17:33:41 $
- $Revision: 1.5 $
+ $Date: 2006-12-15 02:06:56 $
+ $Revision: 1.6 $
 
   ==========================================================================*/
 
 #include <stdio.h>
 #include <stdlib.h>
-//#include <conio.h>
 #include <time.h>
 #include <memory.h>
-//#include <dos.h>
 
 #include "stdint.h"
 
@@ -61,16 +59,12 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
 #define bFALSE  (1==0)
 #endif
-
-// #define SECS(hr,min,sec) (hr*60L*60L + min*60L + sec)
-
-// #define READ_BUFF_SIZE       100000
 
 /*
  * Data structures
@@ -103,12 +97,10 @@ int main (int argc, char *argv[])
     {
     int                 iI106_In;    // Input data file handle
     int                 iI106_Out;   // Output data file handle
-//    unsigned long       ulIrigTime;
 
     EnI106Status        enStatus;
 
     SuI106Ch10Header    suI106Hdr;
-//    unsigned short      usMsgType;
     SuIrig106Time       suTime;
     unsigned long       ulBuffSize = 0;
     void              * pvBuff = NULL;
