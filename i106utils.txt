@@ -5,8 +5,8 @@ IRIG 106 Utilities
 Copyright (C) 2006 Irig106.org
 
 $RCSfile: i106utils.txt,v $
-$Date: 2006-12-10 16:22:32 $
-$Revision: 1.1 $
+$Date: 2006-12-18 03:13:24 $
+$Revision: 1.2 $
 
 Introduction
 ------------
@@ -43,7 +43,6 @@ technically my result in a non-IRIG106 compliant data file.
 Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]
   +hh:mm:ss - Start copy time
   -hh:mm:ss - Stop copy time
-Or:    fftrim <infile> to get stats
 
 
 IDMPTMATS
