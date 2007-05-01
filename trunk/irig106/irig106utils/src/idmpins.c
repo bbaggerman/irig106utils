@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmpins.c,v $
- $Date: 2007-04-30 03:06:07 $
- $Revision: 1.1 $
+ $Date: 2007-05-01 01:58:58 $
+ $Revision: 1.2 $
 
 */
 
@@ -63,7 +63,7 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "03"
+#define MAJOR_VERSION  "01"
 #define MINOR_VERSION  "00"
 
 #if !defined(bTRUE)
@@ -223,17 +223,11 @@ int           m_iI106Handle;
  * -------------------
  */
 
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
 void vUsage(void);
 
-//int  iReadNext1553(SuIrig106Time        * ptTime,
-//                   Su1553F1_CurrMsg     * ptMonMsg);
-
-//int  i1553WordCnt(SuCmd1553 suCmdWord);
-
 void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel);
-
 void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle);
-
 void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
                       double *pdAz, double *pdEl, double *pdDist);
 
@@ -242,47 +236,49 @@ void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
 
 int main (int argc, char *argv[])
   {
-    FILE             *psuOutFile;         // Output file handle
-    SuIrig106Time     suTime;
-    char             *szTime;
-    int               iMilliSec;
-    char              szInFile[80];      // Input file name
-    char              szOutFile[80];     // Output file name
-    int               iIdx;
-    int               iArgIdx;
-    int               bVerbose;
-    int               bDumpAttitude;     // Dump INS aircraft attitude
-    int               bGotINS;           // Got milk?
-    int               bInRange;
-    int               bInRangePrev;
-    unsigned          uChannel;          // Channel number
-    unsigned          uRTAddr;           // RT address of INS
-    unsigned          uTR;               // Transmit bit
-    unsigned          uSubAddr;          // Subaddress of INS message
-    unsigned          uDecimation;       // Decimation factor
-    unsigned          uDecCnt;           // Decimation count
-    unsigned          uINSType;          // Type of INS
-    int               iDumpRelIdx;
-    unsigned long     lINSPoints = 0L;
-    unsigned long     lMsgs = 0L;        // Total message
+    FILE              * psuOutFile;         // Output file handle
+    SuIrig106Time       suTime;
+    char              * szTime;
+    int                 iMilliSec;
+    char                szInFile[80];       // Input file name
+    char                szOutFile[80];      // Output file name
+    int                 iIdx;
+    int                 iArgIdx;
+    int                 bVerbose;
+    int                 bDumpAttitude;      // Dump INS aircraft attitude
+    int                 bGotINS;            // Got milk?
+    int                 bInRange;
+    int                 bInRangePrev;
+    int                 bPrintTMATS;
+    unsigned            uChannel;           // Channel number
+    unsigned            uRTAddr;            // RT address of INS
+    unsigned            uTR;                // Transmit bit
+    unsigned            uSubAddr;           // Subaddress of INS message
+    unsigned            uDecimation;        // Decimation factor
+    unsigned            uDecCnt;            // Decimation count
+    unsigned            uINSType;           // Type of INS
+    int                 iDumpRelIdx;
+    unsigned long       lINSPoints = 0L;
+    unsigned long       lMsgs = 0L;         // Total message
 
-    SuAC_Data         suAC;              // Aircraft data
+    SuAC_Data           suAC;               // Aircraft data
 
-    float             fDumpRadius;
-    SuTargPosLL        * psuFirstTarg = NULL;
-    SuTargPosLL       ** ppsuCurrTarg = &psuFirstTarg;
-    SuTargPosLL        * psuCurrTarg;
+    float               fDumpRadius;
+    SuTargPosLL       * psuFirstTarg = NULL;
+    SuTargPosLL      ** ppsuCurrTarg = &psuFirstTarg;
+    SuTargPosLL       * psuCurrTarg;
 
-    EnI106Status      enStatus;
-    SuI106Ch10Header  suI106Hdr;
+    EnI106Status        enStatus;
+    SuI106Ch10Header    suI106Hdr;
 
-    unsigned long           ulBuffSize = 0L;
-    unsigned char    * pvBuff  = NULL;
+    unsigned long       ulBuffSize = 0L;
+    unsigned char     * pvBuff  = NULL;
 
-    Su1553F1_CurrMsg   su1553Msg;
+    Su1553F1_CurrMsg    su1553Msg;
+    SuTmatsInfo         suTmatsInfo;
 
-    SuINS_Data        *psuINS01     = NULL;
-    SuINS_F15_Data    *psuINS_F15   = NULL;
+    SuINS_Data        * psuINS01     = NULL;
+    SuINS_F15_Data    * psuINS_F15   = NULL;
 
 /* Make sure things stay on UTC */
 
@@ -312,10 +308,11 @@ int main (int argc, char *argv[])
     uSubAddr    = 16;                    /* Subaddress of INS message         */
     uDecimation =  1;                    /* Decimation factor                 */
     uINSType    =  1;
-    bVerbose    = bFALSE;                 /* No verbosity                      */
+    bVerbose    = bFALSE;               // No verbosity
+    bPrintTMATS = bFALSE;
 
     szInFile[0]  = '\0';
-    strcpy(szOutFile,"con");             /* Default is stdout                 */
+    strcpy(szOutFile,"con");            // Default is stdout
 
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
         {
@@ -409,6 +406,10 @@ int main (int argc, char *argv[])
                         sscanf(argv[iArgIdx],"%f",&fDumpRadius);
                         break;
 
+                    case 'T' :                   /* Print TMATS flag */
+                        bPrintTMATS = bTRUE;
+                        break;
+
                     default :
                         break;
                     } // end flag switch
@@ -425,6 +426,13 @@ int main (int argc, char *argv[])
     if ((strlen(szInFile)==0) || (strlen(szOutFile)==0)) 
         {
         vUsage();
+        return 1;
+        }
+
+    if ((uChannel == 0) && (bPrintTMATS == bFALSE))
+        {
+        vUsage();
+        printf("\nERROR - A channel number must be specified\n");
         return 1;
         }
 
@@ -469,6 +477,51 @@ int main (int argc, char *argv[])
         printf("Error opening output file\n");
         return 1;
         }
+
+/*
+ * Read the first header. If TMATS flag set, print TMATS and exit
+ */
+
+    // Read first header and check for data read errors
+    enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
+    if (enStatus != I106_OK)
+        return 1;
+
+    // If TMATS flag set, just print TMATS and exit
+    if (bPrintTMATS == bTRUE)
+        {
+        if (suI106Hdr.ubyDataType == I106CH10_DTYPE_TMATS)
+            {
+            // Make a data buffer for TMATS
+            pvBuff = malloc(suI106Hdr.ulPacketLen);
+            ulBuffSize = suI106Hdr.ulPacketLen;
+
+            // Read the data buffer and check for read errors
+            enStatus = enI106Ch10ReadData(m_iI106Handle, suI106Hdr.ulPacketLen, pvBuff);
+            if (enStatus != I106_OK)
+                return 1;
+
+            // Process the TMATS info
+            enStatus = enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
+            if (enStatus != I106_OK) 
+                {
+                fprintf(stderr, " Error processing TMATS record : Status = %d\n", enStatus);
+                return 1;
+                }
+
+            vPrintTmats(&suTmatsInfo, psuOutFile);
+            } // end if TMATS
+
+        // TMATS not first message
+        else
+            {
+            printf("Error - TMATS message not found\n");
+            return 1;
+            }
+
+        fclose(psuOutFile);
+        return 0;
+        } // end if print TMATS
 
 /*
  * Hold onto your shorts, here we go...
@@ -598,19 +651,15 @@ int main (int argc, char *argv[])
                 while (enStatus == I106_OK)
                     {
 
-/*
- * Look for INS packets
- * --------------------
- */
-
+                     // Look for INS packets
                     if ((su1553Msg.psuCmdWord1->suStruct.uRTAddr  == uRTAddr ) &&
                         (su1553Msg.psuCmdWord1->suStruct.bTR      == uTR     ) &&
                         (su1553Msg.psuCmdWord1->suStruct.uSubAddr == uSubAddr) &&
                         (i1553WordCnt(su1553Msg.psuCmdWord1)      >= 24 ))
                         {
 
-      // Decode INS data
-      // ---------------
+                        // Decode INS data
+                        // ---------------
 
                         // F-16/C-130/A-10 EGI
                         if (uINSType == 1) 
@@ -795,11 +844,10 @@ int main (int argc, char *argv[])
 
         }   // End while
 
-/* Finish up */
+    // Finish up */
 
     printf("Total INS points %8.8ld\n",lINSPoints);
     printf("Total Message %lu\n", lMsgs);
-
 
 /*
  * Close data file and generally clean up
@@ -812,101 +860,94 @@ int main (int argc, char *argv[])
 
 
 
-#if 0
 /* ------------------------------------------------------------------------ */
 
-// Deposit the next 1553 message into a Version 3 MonMsg Block
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+    {
+    int                     iGIndex;
+    int                     iRIndex;
+    int                     iRDsiIndex;
+    SuGDataSource         * psuGDataSource;
+    SuRRecord             * psuRRecord;
+    SuRDataSource         * psuRDataSource;
 
-int iReadNext1553(SuFfdrTime         * psuTime,
-                  SuFfdSummitMonMsg  * psuMonMsg)
-  {
-  union Cmd_U {
-    Cmd1553T  tStruct;
-    short     sShort;
-    };
+    // Print out the TMATS info
+    // ------------------------
 
-  static char          achBuff[1000];
-  int                  iStatus;
-  int                  iRetStatus;
-  unsigned short       usBuffSize;
-  unsigned short       usMsgType;
+    fprintf(ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
 
-      // Loop until 1553 message or EOF
-      while (bTRUE) {
-        usBuffSize = sizeof(achBuff);
-        iStatus = FfdReadNextMessage(&m_tFFD, &usMsgType, psuTime, &usBuffSize, &achBuff);
-        if      (iStatus == EnBioStatus_MORE_DATA) { }
-        else if (iStatus != EnFfdStatus_OK)       break;
-        else if (usMsgType == FFD_SUMMIT_MONITOR) break;
-        } // end while looking for 1553 message
+    // G record
+    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(ptOutFile,"\n");
+    fprintf(ptOutFile,"Channel  Data Source         \n");
+    fprintf(ptOutFile,"-------  --------------------\n");
 
-      // Copy data into user buffer
-      if (iStatus == EnFfdStatus_OK) {
-        memcpy(psuMonMsg, achBuff, usBuffSize);
-        iRetStatus = EnFfdStatus_OK;
-        }
+    // Data sources
+    psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
+    do  {
+        if (psuGDataSource == NULL) break;
 
-      // On error play like end of file
-      else {
-        iRetStatus = EnBioStatus_EOF;
-        }
-      break;
+        // G record data source info
+        iGIndex = psuGDataSource->iDataSourceNum;
 
-  return iRetStatus;
-  }
-#endif
+        // R record info
+        psuRRecord = psuGDataSource->psuRRecord;
+        do  {
+            if (psuRRecord == NULL) break;
+            iRIndex = psuRRecord->iRecordNum;
+
+            // R record data sources
+            psuRDataSource = psuRRecord->psuFirstDataSource;
+            do  {
+                if (psuRDataSource == NULL) 
+                    break;
+                if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
+                    {
+                    iRDsiIndex = psuRDataSource->iDataSourceNum;
+                    fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(ptOutFile,"\n");
+                    }
+                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                } while (bTRUE);
+
+            psuRRecord = psuRRecord->psuNextRRecord;
+            } while (bTRUE);
+
+
+        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        } while (bTRUE);
+
+    return;
+    }
 
 
 /* ------------------------------------------------------------------------ */
 
 void vUsage(void)
-  {
-  printf("DUMPINS "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-  printf("Dump recorded INS data from F-16, C-130, and A-10 EGI aircraft\n");
-  printf("vUsage: idmpins <input file> <output file> [flags]\n");
-  printf("   <filename>       Input/output file names\n");
-  printf("   -v               Verbose\n");
-  printf("   -a               Dump aircraft INS attitude\n");
-  printf("   -c Bus           IRIG Channel Number\n");
-  printf("   -r RT            INS RT Address(1-30) (default 6)\n");
-  printf("   -t T/R           INS T/R Bit (0=R 1=T) (default 1)\n");
-  printf("   -s SA            INS Message Subaddress (default 16)\n");
-  printf("   -d Num           Dump 1 in 'Num' messages (default all)\n");
-  printf("   -i Type          INS Type (default 1)\n");
-  printf("                      1 = F-16/C-130/A-10 EGI\n");
-  printf("                      2 = F-15\n");
-  printf("   -g Lat Lon Elev  Ground target position (ft)\n");
-  printf("   -m Dist          Only dump within this many nautical miles\n");
-  printf("                      of ground target position\n");
-  return;
-  }
+    {
+    printf("IDMPINS "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Dump recorded INS data from F-16, C-130, and A-10 EGI aircraft\n");
+    printf("vUsage: idmpins <input file> <output file> [flags]           \n");
+    printf("   <filename>       Input/output file names                  \n");
+    printf("   -v               Verbose                                  \n");
+    printf("   -a               Dump aircraft INS attitude               \n");
+    printf("   -c Bus           IRIG Channel Number                      \n");
+    printf("   -r RT            INS RT Address(1-30) (default 6)         \n");
+    printf("   -t T/R           INS T/R Bit (0=R 1=T) (default 1)        \n");
+    printf("   -s SA            INS Message Subaddress (default 16)      \n");
+    printf("   -d Num           Dump 1 in 'Num' messages (default all)   \n");
+    printf("   -i Type          INS Type (default 1)                     \n");
+    printf("                      1 = F-16/C-130/A-10 EGI                \n");
+    printf("                      2 = F-15                               \n");
+    printf("   -g Lat Lon Elev  Ground target position (ft)              \n");
+    printf("   -m Dist          Only dump within this many nautical miles\n");
+    printf("                      of ground target position              \n");
+    printf("                                                             \n");
+    printf("   -T               Print TMATS summary and exit             \n");
+    return;
+    }
 
-
-
-/* ------------------------------------------------------------------------ */
-
-#if 0
-/* Return the number of word in a 1553 message taking into account mode codes */
-
-int i1553WordCnt(SuCmd1553 suCmdWord)
-  {
-/* If the subaddress is a mode code then find out number of data words */
-
-    if ((suCmdWord.uSubAddr == 0x0000) ||
-        (suCmdWord.uSubAddr == 0x001f)) {
-      if (suCmdWord.uWordCnt & 0x0010) return 1;
-      else                             return 0;
-      }
-
-/* If regular subaddress find out number of data words */
-
-    else
-      {
-      if (suCmdWord.uWordCnt == 0) return 32;
-      else                        return suCmdWord.uWordCnt;
-      }
-  }
-#endif
 
 
 /* ------------------------------------------------------------------------ */
@@ -929,30 +970,30 @@ int i1553WordCnt(SuCmd1553 suCmdWord)
  */
 
 void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel)
-{
-  double  dRelX, dRelY, dRelZ;
-  double  dAz,   dEl,   dRange;
+    {
+    double  dRelX, dRelY, dRelZ;
+    double  dAz,   dEl,   dRange;
 
-  // Calculate the vector from the psuFrom to the psuTo point.  The psuFrom
-  // point is always at the origin.  Note that this is an aproximation
-  // that doesn't take into account the curvature of the earth.
-  dRelX = (psuTo->dLon      - psuFrom->dLon) * 60.0 * cos(DEG_TO_RAD(psuTo->dLat));
-  dRelY = (psuTo->dLat      - psuFrom->dLat) * 60.0;
-  dRelZ = (psuTo->fAltitude - psuFrom->fAltitude) / 6080.0;
+    // Calculate the vector from the psuFrom to the psuTo point.  The psuFrom
+    // point is always at the origin.  Note that this is an aproximation
+    // that doesn't take into account the curvature of the earth.
+    dRelX = (psuTo->dLon      - psuFrom->dLon) * 60.0 * cos(DEG_TO_RAD(psuTo->dLat));
+    dRelY = (psuTo->dLat      - psuFrom->dLat) * 60.0;
+    dRelZ = (psuTo->fAltitude - psuFrom->fAltitude) / 6080.0;
 
-  // Rotate about the heading, pitch, and roll axes. Order is important!
-  vRotate(&dRelX, &dRelY, -psuFrom->fHeading);
-  vRotate(&dRelY, &dRelZ,  psuFrom->fPitch);
-  vRotate(&dRelX, &dRelZ, -psuFrom->fRoll);
+    // Rotate about the heading, pitch, and roll axes. Order is important!
+    vRotate(&dRelX, &dRelY, -psuFrom->fHeading);
+    vRotate(&dRelY, &dRelZ,  psuFrom->fPitch);
+    vRotate(&dRelX, &dRelZ, -psuFrom->fRoll);
 
-  // Convert to polar coordinates
-  vXYZ_To_AzElDist(dRelX, dRelY, dRelZ, &dAz, &dEl, &dRange);
-  psuRel->fAz    = (float)fmod(dAz+360.0, 360.0);
-  psuRel->fEl    = (float)dEl;
-  psuRel->fRange = (float)dRange;
+    // Convert to polar coordinates
+    vXYZ_To_AzElDist(dRelX, dRelY, dRelZ, &dAz, &dEl, &dRange);
+    psuRel->fAz    = (float)fmod(dAz+360.0, 360.0);
+    psuRel->fEl    = (float)dEl;
+    psuRel->fRange = (float)dRange;
 
-  return;
-}
+    return;
+    }
 
 
 
@@ -962,20 +1003,20 @@ void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel)
    The rotation angle is in degrees, and positive rotation is clockwise. */
 
 void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle)
-  {
-  double  dStartAngle;
-  double  dDistance;
+    {
+    double  dStartAngle;
+    double  dDistance;
 
-  // Convert to polar coordinates
-  dStartAngle = atan2(*pdYPos,*pdXPos);
-  dDistance   = sqrt((*pdXPos)*(*pdXPos)+(*pdYPos)*(*pdYPos));
+    // Convert to polar coordinates
+    dStartAngle = atan2(*pdYPos,*pdXPos);
+    dDistance   = sqrt((*pdXPos)*(*pdXPos)+(*pdYPos)*(*pdYPos));
 
-  // Subtract rotation angle and convert back to rectangular coordinates
-  *pdXPos = dDistance * cos(dStartAngle - DEG_TO_RAD(dRotateAngle));
-  *pdYPos = dDistance * sin(dStartAngle - DEG_TO_RAD(dRotateAngle));
+    // Subtract rotation angle and convert back to rectangular coordinates
+    *pdXPos = dDistance * cos(dStartAngle - DEG_TO_RAD(dRotateAngle));
+    *pdYPos = dDistance * sin(dStartAngle - DEG_TO_RAD(dRotateAngle));
 
-  return;
-  }
+    return;
+    }
 
 
 
@@ -985,13 +1026,13 @@ void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle)
 
 void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
                       double *pdAz, double *pdEl, double *pdDist)
-  {
+    {
 
-  *pdDist = sqrt(dX*dX + dY*dY + dZ*dZ);
-  *pdAz   = 90.0 - RAD_TO_DEG(atan2(dY, dX));
-  *pdEl   = RAD_TO_DEG(asin(dZ/(*pdDist)));
+    *pdDist = sqrt(dX*dX + dY*dY + dZ*dZ);
+    *pdAz   = 90.0 - RAD_TO_DEG(atan2(dY, dX));
+    *pdEl   = RAD_TO_DEG(asin(dZ/(*pdDist)));
 
-  return;
-  }
+    return;
+    }
 
 
