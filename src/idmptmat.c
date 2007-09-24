@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmptmat.c,v $
- $Date: 2006-12-09 17:33:41 $
- $Revision: 1.5 $
+ $Date: 2007-09-24 20:46:47 $
+ $Revision: 1.6 $
 
  ****************************************************************************/
 
@@ -58,8 +58,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -189,10 +189,17 @@ int main(int argc, char ** argv)
 
     // Open file and allocate a buffer for reading data.
     enStatus = enI106Ch10Open(&iI106Ch10Handle, szInFile, I106_READ);
-    if (enStatus != I106_OK)
+    switch (enStatus)
         {
-        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
-        return 1;
+        case I106_OPEN_WARNING :
+            fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
+            break;
+        case I106_OK :
+            break;
+        default :
+            fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
+            return 1;
+            break;
         }
 
     // If output file specified then open it    
@@ -226,10 +233,10 @@ int main(int argc, char ** argv)
         }
 
     // Make sure our buffer is big enough, size *does* matter
-    if (ulBuffSize < suI106Hdr.ulDataLen+8)
+    if (ulBuffSize < uGetDataLen(&suI106Hdr))
         {
-        pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
-        ulBuffSize = suI106Hdr.ulDataLen+8;
+        pvBuff = realloc(pvBuff, uGetDataLen(&suI106Hdr));
+        ulBuffSize = uGetDataLen(&suI106Hdr);
         }
 
     // Read the data buffer
