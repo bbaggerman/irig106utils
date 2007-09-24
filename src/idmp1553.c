@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmp1553.c,v $
- $Date: 2006-12-10 01:14:40 $
- $Revision: 1.4 $
+ $Date: 2007-09-24 20:49:33 $
+ $Revision: 1.5 $
 
 */
 
@@ -62,8 +62,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -121,6 +121,7 @@ int main(int argc, char ** argv)
     int                     bDecimal;         // Hex/decimal flag
     int                     bStatusResponse;
     int                     bPrintTMATS;
+    int                     bInOrder;         // Dump out in order
     unsigned long           ulBuffSize = 0L;
     unsigned int            uErrorFlags;
 
@@ -131,7 +132,6 @@ int main(int argc, char ** argv)
     SuIrig106Time           suTime;
     Su1553F1_CurrMsg        su1553Msg;
     SuTmatsInfo             suTmatsInfo;
-
 
 /*
  * Process the command line arguements
@@ -153,6 +153,7 @@ int main(int argc, char ** argv)
     bDecimal        = bFALSE;
     bStatusResponse = bFALSE;
     bPrintTMATS     = bFALSE;
+    bInOrder        = bFALSE;
 
     szInFile[0]  = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
@@ -215,6 +216,10 @@ int main(int argc, char ** argv)
             bStatusResponse = bTRUE;
             break;
 
+          case 'o' :                   /* Dump in time order */
+            bInOrder = bTRUE;
+            break;
+
           case 'T' :                   /* Print TMATS flag */
             bPrintTMATS = bTRUE;
             break;
@@ -252,11 +257,22 @@ int main(int argc, char ** argv)
  *  Open file and allocate a buffer for reading data.
  */
 
-    enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
-    if (enStatus != I106_OK)
+    if (bInOrder)
+        enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ_IN_ORDER);
+    else
+        enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
+
+    switch (enStatus)
         {
-        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
-        return 1;
+        case I106_OPEN_WARNING :
+            fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
+            break;
+        case I106_OK :
+            break;
+        default :
+            fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
+            return 1;
+            break;
         }
 
     enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
@@ -406,7 +422,7 @@ int main(int argc, char ** argv)
                             // Print out the command word
                             fprintf(ptOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
                               suI106Hdr.uChID,
-                              su1553Msg.psu1553Hdr->iBusID ? 'A' : 'B',
+                              su1553Msg.psu1553Hdr->iBusID ? 'B' : 'A',
                               su1553Msg.psuCmdWord1->suStruct.uRTAddr,
                               su1553Msg.psuCmdWord1->suStruct.bTR ? 'T' : 'R',
                               su1553Msg.psuCmdWord1->suStruct.uSubAddr,
@@ -575,6 +591,7 @@ void vUsage(void)
     printf("   -d Num     Dump 1 in 'Num' messages       \n");
     printf("   -i         Dump data as decimal integers  \n");
     printf("   -u         Dump status response           \n");
+    printf("   -o         Dump in time order             \n");
     printf("                                             \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
