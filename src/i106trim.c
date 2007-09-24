@@ -37,8 +37,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106trim.c,v $
- $Date: 2006-12-15 02:06:56 $
- $Revision: 1.6 $
+ $Date: 2007-09-24 20:51:41 $
+ $Revision: 1.7 $
 
   ==========================================================================*/
 
@@ -46,6 +46,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <memory.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "stdint.h"
 
@@ -58,8 +60,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -86,8 +88,9 @@ unsigned long   m_ulBuffSize = 0L;
  */
 
 // void vStats(char *szFileName);
-void vUsage(void);
-time_t mkgmtime(struct tm * tm);
+int64_t GetCh10FileSize(char * szFilename);
+void    vUsage(void);
+time_t  mkgmtime(struct tm * tm);
 
 
 
@@ -105,11 +108,13 @@ int main (int argc, char *argv[])
     unsigned long       ulBuffSize = 0;
     void              * pvBuff = NULL;
 
+    SuI106Ch10Header    suTimeHdr;
+    void              * pvTimeBuff = NULL;
+    unsigned long       ulTimeBuffSize = 0;
+
     struct tm         * psuTmTime;
 
     int                 iArgIdx;
-    int                 iStartHour, iStartMin, iStartSec;
-    int                 iStopHour,  iStopMin,  iStopSec;
 
     long                lWriteMsgs = 0L;
 
@@ -123,9 +128,21 @@ int main (int argc, char *argv[])
 
     int                 bUseStartTime;
     int                 bUseStopTime;
+    int                 iStartHour, iStartMin, iStartSec;
+    int                 iStopHour,  iStopMin,  iStopSec;
+
+    int                 bUseStartPercent;
+    int                 bUseStopPercent;
+    float               fStartPercent;
+    float               fStopPercent;
+    int64_t             llFileSize;
+    int64_t             llStartOffset;
+    int64_t             llStopOffset;
+    int64_t             llCurrOffset;
+
     int                 bFoundTmats = bFALSE;
-    int                 bFoundTime  = bFALSE;
-    int                 bCopyPacket;
+    int                 bHaveTime  = bFALSE;
+    int                 bNeedTime   = bTRUE;
 
     int                 iStatus;
 
@@ -150,25 +167,52 @@ int main (int argc, char *argv[])
             {
 
             case '+' :
+                // Try to decode a time
                 iStatus = sscanf(argv[iArgIdx],"+%d:%d:%d",
                     &iStartHour,&iStartMin,&iStartSec);
-                if (iStatus != 3) 
+                if (iStatus == 3)
                     {
-                    vUsage();
-                    return 1;
+                    bUseStartTime    = bTRUE;
+                    bUseStartPercent = bFALSE;
+                    break;
                     }
-                bUseStartTime = bTRUE;
+
+                // Try to decode a percentage
+                iStatus = sscanf(argv[iArgIdx],"+%f%%", &fStartPercent);
+                if (iStatus == 1)
+                    {
+                    bUseStartTime    = bFALSE;
+                    bUseStartPercent = bTRUE;
+                    break;
+                    }
+
+                // Neither worked so it must be an error
+                vUsage();
+                return 1;
                 break;
 
             case '-' :
+                // Try to decode a time
                 iStatus = sscanf(argv[iArgIdx],"-%d:%d:%d",
                     &iStopHour,&iStopMin,&iStopSec);
-                if (iStatus != 3) 
+                if (iStatus == 3) 
                     {
-                    vUsage();
-                    return 1;
+                    bUseStopTime    = bTRUE;
+                    bUseStopPercent = bFALSE;
+                    break;
                     }
-                bUseStopTime = bTRUE;
+
+                // Try to decode a percentage
+                iStatus = sscanf(argv[iArgIdx],"-%f%%", &fStopPercent);
+                if (iStatus == 1)
+                    {
+                    bUseStopTime    = bFALSE;
+                    bUseStopPercent = bTRUE;
+                    break;
+                    }
+
+                vUsage();
+                return 1;
                 break;
 
             } /* end command line arg switch */
@@ -188,10 +232,17 @@ int main (int argc, char *argv[])
 
     // Open the input data file
     enStatus = enI106Ch10Open(&iI106_In, argv[1], I106_READ);
-    if (enStatus != I106_OK)
+    switch (enStatus)
         {
-        fprintf(stderr, "Error opening input data file : Status = %d\n", enStatus);
-        return 1;
+        case I106_OPEN_WARNING :
+            fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
+            break;
+        case I106_OK :
+            break;
+        default :
+            fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
+            return 1;
+            break;
         }
 
     // Get clock time synchronized
@@ -222,8 +273,9 @@ int main (int argc, char *argv[])
 /*
  * Read the first message header and setup some stuff
  */
-    
+ 
     // Read the first message header
+    enI106Ch10GetPos(iI106_In, &llCurrOffset);
     enStatus = enI106Ch10ReadNextHeader(iI106_In, &suI106Hdr);
 
     // Check for read errors and end of file
@@ -270,6 +322,19 @@ int main (int argc, char *argv[])
             llStopTime += (int64_t)(60 * 60 * 24) * (int64_t)10000000;
         }
 
+    // Figure out strart/stop offsets
+    if (bUseStartPercent == bTRUE)
+        {
+        llFileSize    = GetCh10FileSize(argv[1]);
+        llStartOffset = (int64_t)(llFileSize * (fStartPercent / 100.0));
+        }
+
+    if (bUseStopPercent == bTRUE)
+        {
+        llFileSize    = GetCh10FileSize(argv[1]);
+        llStopOffset  = (int64_t)(llFileSize * (fStopPercent / 100.0));
+        }
+
     // Try jumping to the start time
     if (bUseStartTime == bTRUE) 
         {
@@ -285,48 +350,111 @@ int main (int argc, char *argv[])
         {
 
         vTimeArray2LLInt(suI106Hdr.aubyRefTime, &llPacketTime);
-        bCopyPacket = bFALSE;
 
-        // If before time limit, handle any special processing
-        if ((bUseStartTime == bTRUE) && (llPacketTime < llStartTime))
+        // Check for special conditions and state changes
+        // ----------------------------------------------
+
+        // If we trim data off the beginning of the file, a few special things
+        // need to happen.  The TMATS record needs to be copied to the output
+        // file regardless.  A time packet needs to be written before any
+        // data packets.  This logic keeps running copy of the latest time
+        // packet.  When it's time for data to be written, first write the most
+        // recent time packet.
+
+        // If before time or offset limit, handle any special processing
+        if ((bUseStartTime    == bTRUE) && (llPacketTime < llStartTime  )  ||
+            (bUseStartPercent == bTRUE) && (llCurrOffset < llStartOffset))
             {
 
             if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_TMATS) &&
-                (bFoundTmats           == bFALSE))
+                (bFoundTmats           == bFALSE              ))
                 {
-                // If it's TMATS, rewrite some of the fields
-// SAVE THIS MESS FOR ANOTHER DAY
-                bCopyPacket = bTRUE;
-                bFoundTmats = bTRUE;
-                }
 
-            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME) &&
-                (bFoundTime            == bFALSE))
+                // Make sure our buffer is big enough, size *does* matter
+                if (ulBuffSize < suI106Hdr.ulPacketLen)
+                    {
+                    pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                    ulBuffSize = suI106Hdr.ulPacketLen;
+                    }
+
+                // Read the data
+                enStatus = enI106Ch10ReadData(iI106_In, ulBuffSize, pvBuff);
+                if (enStatus != I106_OK)
+                    {
+                    fprintf(stderr, " Error reading header : Status = %d\n", enStatus);
+                    continue;
+                    }
+
+                // If it's TMATS, rewrite some of the fields
+                // SAVE THIS MESS FOR ANOTHER DAY
+
+                // Write it to the output file
+                enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
+                } // end it TMATS packet
+
+            // If it's a time packet keep a copy of the latest
+            if (suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME)
                 {
-                bCopyPacket = bTRUE;
-                bFoundTime  = bTRUE;
-                }
+                // Make sure our time buffer is big enough
+                if (ulTimeBuffSize < suI106Hdr.ulPacketLen)
+                    {
+                    pvTimeBuff = realloc(pvTimeBuff, suI106Hdr.ulPacketLen);
+                    ulTimeBuffSize = suI106Hdr.ulPacketLen;
+                    }
+
+                // Save the header
+                memcpy(&suTimeHdr, &suI106Hdr, sizeof(SuI106Ch10Header));
+
+                // Read and save the data
+                enStatus = enI106Ch10ReadData(iI106_In, ulTimeBuffSize, pvTimeBuff);
+                bHaveTime = bTRUE;
+
+                // Update the relative to clock time mapping and update the time limit values
+                enI106_Decode_TimeF1(&suTimeHdr, pvTimeBuff, &suTime);
+                enI106_SetRelTime(iI106_In, &suTime, suI106Hdr.aubyRefTime);
+                if (bUseStartTime == bTRUE)
+                    {
+                    enI106_Irig2RelTime(iI106_In, &suStartTime, abyStartTime);
+                    llStartTime = 0L;
+                    memcpy((char *)&(llStartTime), (char *)&abyStartTime, 6);
+                    }
+                if (bUseStopTime == bTRUE)
+                    {
+                    enI106_Irig2RelTime(iI106_In, &suStopTime, abyStopTime);
+                    llStopTime = 0L;
+                    memcpy((char *)&(llStopTime), (char *)&abyStopTime, 6);
+                    // Handle midnight rollover
+                    if ((bUseStartTime == bTRUE) && (llStopTime < llStartTime))
+                        llStopTime += (int64_t)(60 * 60 * 24) * (int64_t)10000000;
+                    }
+                } // end if IRIG time packet
 
 // MIGHT NEED TO DO SOME STUFF WITH INDEX PACKETS HERE
             } // if before time limit
 
-        // If after time limit, handle any special processing
-        else if ((bUseStopTime  == bTRUE) && (llPacketTime > llStopTime ))
+
+        // If after time or offset limit, handle any special processing
+        else if ((bUseStopTime    == bTRUE) && (llPacketTime > llStopTime  )  ||
+                 (bUseStopPercent == bTRUE) && (llCurrOffset > llStopOffset))
             break;
+
 
         // Any other state is just a copy
         else
-            bCopyPacket = bTRUE;
-
-        // Read and copy to packet to the output file
-        if (bCopyPacket == bTRUE)
             {
 
-            // Make sure our buffer is big enough, size *does* matter
-            if (ulBuffSize < suI106Hdr.ulDataLen+8)
+            // If we have time and need time, then first write time
+            if ((bHaveTime == bTRUE) && (bNeedTime == bTRUE))
                 {
-                pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
-                ulBuffSize = suI106Hdr.ulDataLen+8;
+                enStatus = enI106Ch10WriteMsg(iI106_Out, &suTimeHdr, pvTimeBuff);
+                bNeedTime = bFALSE;
+                }
+
+            // Make sure our buffer is big enough, size *does* matter
+            if (ulBuffSize < suI106Hdr.ulPacketLen)
+                {
+                pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                ulBuffSize = suI106Hdr.ulPacketLen;
                 }
 
             // Read the data
@@ -338,14 +466,17 @@ int main (int argc, char *argv[])
                 }
 
             // If it's an index record fix it up
-// NEED TO IMPLEMENT INDEX RECORDS SOME DAY
+            // NEED TO IMPLEMENT INDEX RECORDS SOME DAY
 
             // Write it to the output file
             enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
-            }
+            } // end else just copy
+
+
         lWriteMsgs++;
 
         // Read the next message header
+        enI106Ch10GetPos(iI106_In, &llCurrOffset);
         enStatus = enI106Ch10ReadNextHeader(iI106_In, &suI106Hdr);
 
         // Check for read errors and end of file
@@ -373,6 +504,21 @@ int main (int argc, char *argv[])
   return 0;
   }
 
+
+
+/* ------------------------------------------------------------------------ */
+
+int64_t GetCh10FileSize(char * szFilename)
+    {
+
+#if defined(_MSC_VER)
+    struct _stati64    suFileInfo; 
+    _stati64(szFilename, &suFileInfo);
+    return suFileInfo.st_size;
+#else
+#endif
+
+    }
 
 
 #if 0
@@ -436,10 +582,10 @@ int iFindFirstTime(int iI106Handle)
             }
 
         // Make sure our buffer is big enough, size *does* matter
-        if (m_ulBuffSize < suI106Hdr.ulDataLen)
+        if (m_ulBuffSize < suI106Hdr.ulPacketLen)
             {
-            m_pvBuff = realloc(m_pvBuff, suI106Hdr.ulDataLen);
-            m_ulBuffSize = suI106Hdr.ulDataLen;
+            m_pvBuff = realloc(m_pvBuff, suI106Hdr.ulPacketLen);
+            m_ulBuffSize = suI106Hdr.ulPacketLen;
             }
 
         // Read the next data buffer
@@ -470,6 +616,8 @@ void vUsage(void)
     printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
     printf("  +hh:mm:ss - Start copy time\n");
     printf("  -hh:mm:ss - Stop copy time\n");
+    printf("  +<num>%   - Start copy at position <num> percent into the file\n");
+    printf("  -<num>%   - Stop copy at position <num> percent into the file\n");
     printf("Or:    fftrim <infile> to get stats\n");
     return;
     }
