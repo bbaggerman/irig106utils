@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmpins.c,v $
- $Date: 2007-05-01 01:58:58 $
- $Revision: 1.2 $
+ $Date: 2007-09-24 20:55:30 $
+ $Revision: 1.3 $
 
 */
 
@@ -63,8 +63,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -453,10 +453,17 @@ int main (int argc, char *argv[])
  */
 
     enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
-    if (enStatus != I106_OK)
+    switch (enStatus)
         {
-        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
-        return 1;
+        case I106_OPEN_WARNING :
+            fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
+            break;
+        case I106_OK :
+            break;
+        default :
+            fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
+            return 1;
+            break;
         }
 
     enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
