@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: i106stat.c,v $
- $Date: 2006-12-09 17:31:59 $
- $Revision: 1.8 $
+ $Date: 2007-09-24 20:54:15 $
+ $Revision: 1.9 $
 
  ****************************************************************************/
 
@@ -50,8 +50,8 @@
 #include "config.h"
 #include "stdint.h"
 #include "irig106ch10.h"
-
 #include "i106_time.h"
+
 #include "i106_decode_time.h"
 #include "i106_decode_1553f1.h"
 #include "i106_decode_tmats.h"
@@ -62,8 +62,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -164,7 +164,9 @@ int main(int argc, char ** argv)
     SuIrig106Time           suIrigTime;
     struct tm             * psuTmTime;
     char                    szTime[50];
-    char                  * szTimeFmt = "%m/%d/%Y %H:%M:%S";
+    char                  * szDateTimeFmt = "%m/%d/%Y %H:%M:%S";
+    char                  * szDayTimeFmt  = "%j:%H:%M:%S";
+    char                  * szTimeFmt;
 
     unsigned char         * pvBuff = NULL;
 
@@ -251,10 +253,17 @@ int main(int argc, char ** argv)
 
     // Open file and allocate a buffer for reading data.
     enStatus = enI106Ch10Open(&hI106In, szInFile, I106_READ);
-    if (enStatus != I106_OK)
+    switch (enStatus)
         {
-        fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
-        return 1;
+        case I106_OPEN_WARNING :
+            fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
+            break;
+        case I106_OK :
+            break;
+        default :
+            fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
+            return 1;
+            break;
         }
 
     enStatus = enI106_SyncTime(hI106In, bFALSE, 0);
@@ -313,10 +322,10 @@ int main(int argc, char ** argv)
                 }
 
             // Make sure our buffer is big enough, size *does* matter
-            if (ulBuffSize < suI106Hdr.ulDataLen+8)
+            if (ulBuffSize < uGetDataLen(&suI106Hdr))
                 {
-                pvBuff = realloc(pvBuff, suI106Hdr.ulDataLen+8);
-                ulBuffSize = suI106Hdr.ulDataLen+8;
+                pvBuff = realloc(pvBuff, uGetDataLen(&suI106Hdr));
+                ulBuffSize = uGetDataLen(&suI106Hdr);
                 }
 
             // Read the data buffer
@@ -459,11 +468,11 @@ int main(int argc, char ** argv)
                     apsuChanInfo[suI106Hdr.uChID]->ulAnalog++;
                     break;
 
-                case I106CH10_DTYPE_MPEG2 :             // 0x40
+                case I106CH10_DTYPE_VIDEO_FMT_0 :       // 0x40
                     apsuChanInfo[suI106Hdr.uChID]->ulMPEG2++;
                     break;
 
-                case I106CH10_DTYPE_UART :              // 0x50
+                case I106CH10_DTYPE_UART_FMT_0 :        // 0x50
                     apsuChanInfo[suI106Hdr.uChID]->ulUART++;
                     break;
 
@@ -500,9 +509,14 @@ int main(int argc, char ** argv)
             }
         }
 
+    
     fprintf(ptOutFile,"=-=-= File Time Summary =-=-=\n\n");
 
     enI106_Rel2IrigTime(hI106In, abyFileStartTime, &suIrigTime);
+    if (suIrigTime.enFmt == I106_DATEFMT_DMY)
+        szTimeFmt = szDateTimeFmt;
+    else
+        szTimeFmt = szDayTimeFmt;
     psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
     strftime(szTime, 50, szTimeFmt, psuTmTime);
     fprintf(ptOutFile,"File Start %s\n",  szTime);
