@@ -36,8 +36,8 @@
  Created by Bob Baggerman
 
  $RCSfile: idmp1553.c,v $
- $Date: 2007-09-24 20:49:33 $
- $Revision: 1.5 $
+ $Date: 2008-03-01 04:27:44 $
+ $Revision: 1.6 $
 
 */
 
@@ -102,8 +102,10 @@ void vUsage(void);
 int main(int argc, char ** argv)
   {
 
-    char                    szInFile[80];     // Input file name
-    char                    szOutFile[80];    // Output file name
+    char                    szInFile[256];     // Input file name
+    char                    szOutFile[256];    // Output file name
+    char                    szIdxFileName[256];
+    char                  * pchFileNameChar;
     int                     iArgIdx;
     FILE                  * ptOutFile;        // Output file handle
     char                  * szTime;
@@ -125,6 +127,7 @@ int main(int argc, char ** argv)
     unsigned long           ulBuffSize = 0L;
     unsigned int            uErrorFlags;
 
+    int                     iStatus;
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
 
@@ -258,7 +261,31 @@ int main(int argc, char ** argv)
  */
 
     if (bInOrder)
-        enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ_IN_ORDER);
+        {
+        do 
+            {
+            // Open the data file
+            enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ_IN_ORDER);
+            if (enStatus != I106_OK)
+                break;
+
+            // Make the index file name
+            strcpy(szIdxFileName, szInFile);
+            pchFileNameChar = strrchr(szIdxFileName, '.');
+            if (pchFileNameChar != NULL)
+                *pchFileNameChar = '\0';
+            strcat(szIdxFileName, ".iid");
+
+            // Read or make the index
+            iStatus = bReadInOrderIndex(m_iI106Handle, szIdxFileName);
+            if (iStatus == bFALSE)
+                {
+                vMakeInOrderIndex(m_iI106Handle);
+                iStatus = bWriteInOrderIndex(m_iI106Handle, szIdxFileName);
+                }
+            } while (bFALSE);
+        }
+
     else
         enStatus = enI106Ch10Open(&m_iI106Handle, szInFile, I106_READ);
 
