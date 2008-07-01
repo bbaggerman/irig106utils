@@ -294,7 +294,7 @@ int main(int argc, char ** argv)
                 break;
 
             // If video message then process it
-            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_MPEG2) &&
+            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_VIDEO_FMT_0) &&
                 ((iChannel == -1) || (iChannel == (int)suI106Hdr.uChID)))
                 {
 
