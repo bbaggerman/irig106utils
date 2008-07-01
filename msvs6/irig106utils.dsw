@@ -3,7 +3,7 @@ Microsoft Developer Studio Workspace File, Format Version 6.00
 
 ###############################################################################
 
-Project: "i106stat"=".\i106stat.dsp" - Package Owner=<4>
+Project: "i106stat"=.\i106stat.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -11,11 +11,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "i106trim"=".\i106trim.dsp" - Package Owner=<4>
+Project: "i106trim"=.\i106trim.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -23,11 +26,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "i106vid"=".\i106vid.dsp" - Package Owner=<4>
+Project: "i106vid"=.\i106vid.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -35,11 +41,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "idmp1553"=".\idmp1553.dsp" - Package Owner=<4>
+Project: "idmp1553"=.\idmp1553.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -47,11 +56,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "idmpins"=".\idmpins.dsp" - Package Owner=<4>
+Project: "idmpins"=.\idmpins.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -59,11 +71,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "idmptmat"=".\idmptmat.dsp" - Package Owner=<4>
+Project: "idmptmat"=.\idmptmat.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
@@ -71,11 +86,14 @@ Package=<5>
 
 Package=<4>
 {{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
 }}}
 
 ###############################################################################
 
-Project: "irig106"="..\irig106lib\irig106.dsp" - Package Owner=<4>
+Project: "irig106"=..\..\irig106lib\msvs6\irig106.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
