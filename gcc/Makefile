@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 
 SRC_DIR=../src
-CFLAGS=-I../../irig106lib/src -I-
+CFLAGS=-I../../irig106lib/src -I- -g
 LIBS=../../irig106lib/gcc/libirig106.a
 
 
