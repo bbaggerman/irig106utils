@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: idmptmat.c,v $
- $Date: 2007-09-24 20:46:47 $
- $Revision: 1.6 $
-
  ****************************************************************************/
 
 #include <stdio.h>

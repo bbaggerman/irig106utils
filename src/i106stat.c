@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: i106stat.c,v $
- $Date: 2007-09-24 20:54:15 $
- $Revision: 1.9 $
-
  ****************************************************************************/
 
 #include <stdio.h>
