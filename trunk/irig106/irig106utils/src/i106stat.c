@@ -35,6 +35,10 @@
 
  Created by Bob Baggerman
 
+ $RCSfile: i106stat.c $
+ $Date: 2008/07/02 12:59:36EDT $
+ $Revision: 1.3 $
+
  ****************************************************************************/
 
 #include <stdio.h>
@@ -165,6 +169,8 @@ int main(int argc, char ** argv)
     char                  * szTimeFmt;
 
     unsigned char         * pvBuff = NULL;
+
+    memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
 
 // Make sure things stay on UTC
 
