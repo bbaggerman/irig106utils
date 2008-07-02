@@ -507,6 +507,7 @@ int main (int argc, char *argv[])
                 return 1;
 
             // Process the TMATS info
+            memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
             enStatus = enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
             if (enStatus != I106_OK) 
                 {

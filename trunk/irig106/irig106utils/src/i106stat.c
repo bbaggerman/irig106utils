@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: i106stat.c $
- $Date: 2008/07/02 12:59:36EDT $
- $Revision: 1.3 $
-
  ****************************************************************************/
 
 #include <stdio.h>
@@ -170,7 +166,6 @@ int main(int argc, char ** argv)
 
     unsigned char         * pvBuff = NULL;
 
-    memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
 
 // Make sure things stay on UTC
 
@@ -398,6 +393,7 @@ int main(int argc, char ** argv)
                         memcpy((char *)&abyFileStartTime, (char *)suI106Hdr.aubyRefTime, 6);
 
                         // Process TMATS info for later use
+                        memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
                         enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
                         if (enStatus != I106_OK) 
                             break;

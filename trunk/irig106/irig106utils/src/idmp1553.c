@@ -252,6 +252,9 @@ int main(int argc, char ** argv)
     fprintf(stderr, "\nIDMP1553 "MAJOR_VERSION"."MINOR_VERSION"\n");
     fprintf(stderr, "Freeware Copyright (C) 2006 Irig106.org\n\n");
 
+	putenv("TZ=GMT0");
+	tzset();
+
 /*
  *  Open file and allocate a buffer for reading data.
  */
@@ -351,6 +354,7 @@ int main(int argc, char ** argv)
                 return 1;
 
             // Process the TMATS info
+            memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
             enStatus = enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
             if (enStatus != I106_OK) 
                 {
@@ -438,8 +442,8 @@ int main(int argc, char ** argv)
                             enI106_Rel2IrigTime(m_iI106Handle,
                                 su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
                             szTime = ctime((time_t *)&suTime.ulSecs);
-                            szTime[19] = '\0';
-                            iMilliSec = (int)(suTime.ulFrac / 10000.0);
+							szTime[19] = '\0';
+							iMilliSec = (int)(suTime.ulFrac / 10000.0);
                             fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
 
                             // Print out the command word
