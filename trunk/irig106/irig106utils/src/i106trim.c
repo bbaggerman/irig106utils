@@ -36,10 +36,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: i106trim.c,v $
- $Date: 2007-09-24 20:51:41 $
- $Revision: 1.7 $
-
   ==========================================================================*/
 
 #include <stdio.h>

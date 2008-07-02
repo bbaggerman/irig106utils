@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: idmp1553.c,v $
- $Date: 2008-03-01 04:27:44 $
- $Revision: 1.6 $
-
 */
 
 #include <stdio.h>

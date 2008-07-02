@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: i106vid.c,v $
- $Date: 2006-12-18 03:14:30 $
- $Revision: 1.1 $
-
 */
 
 #include <stdio.h>
