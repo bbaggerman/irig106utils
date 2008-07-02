@@ -35,10 +35,6 @@
 
  Created by Bob Baggerman
 
- $RCSfile: idmpins.c,v $
- $Date: 2007-09-24 20:55:30 $
- $Revision: 1.3 $
-
 */
 
 #include <stdio.h>
@@ -74,7 +70,7 @@
 #define PREEGI_INS_SA_POSITION      27
 #define PREEGI_INS_SA_ATTITUDE      25
 
-#if __GCC__
+#if !defined(__GNUC__)
 #define M_PI        3.14159265358979323846
 #define M_PI_2      1.57079632679489661923
 #define M_PI_4      0.785398163397448309616
