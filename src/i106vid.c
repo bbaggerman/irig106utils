@@ -52,6 +52,10 @@
 #include "i106_decode_video.h"
 #include "i106_decode_tmats.h"
 
+#define inline __inline  // Make Microsoft happy
+#define int64_t_C(c)     (c ## i64)
+#define uint64_t_C(c)    (c ## ui64)
+//#include "avformat.h"
 
 /*
  * Macros and definitions
@@ -247,6 +251,7 @@ int main(int argc, char ** argv)
                 return 1;
 
             // Process the TMATS info
+            memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
             enStatus = enI106_Decode_Tmats(&suI106Hdr, pvBuff, &suTmatsInfo);
             if (enStatus != I106_OK) 
                 {
@@ -266,6 +271,13 @@ int main(int argc, char ** argv)
 
         return 0;
         } // end if print TMATS
+
+
+/*
+ * Init ffmpeg
+ */
+
+//    av_register_all();
 
 /*
  * Read messages until error or EOF
@@ -290,7 +302,7 @@ int main(int argc, char ** argv)
                 break;
 
             // If video message then process it
-            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_VIDEO_FMT_0) &&
+            if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_VIDEO_FMT_1) &&
                 ((iChannel == -1) || (iChannel == (int)suI106Hdr.uChID)))
                 {
 
@@ -377,7 +389,7 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
+    fprintf(ptOutFile,"\n=-=-= Video Channel Summary =-=-=\n\n");
 
     // G record
     fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);

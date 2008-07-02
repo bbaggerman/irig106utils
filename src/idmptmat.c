@@ -303,6 +303,7 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
     SuRDataSource         * psuRDataSource;
 
     // Process the TMATS info
+    memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
     enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
     if (enStatus != I106_OK) 
         {
@@ -377,6 +378,7 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
     SuRDataSource         * psuRDataSource;
 
     // Process the TMATS info
+    memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
     enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
     if (enStatus != I106_OK) 
         {
