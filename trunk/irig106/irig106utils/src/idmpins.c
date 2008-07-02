@@ -74,9 +74,11 @@
 #define PREEGI_INS_SA_POSITION      27
 #define PREEGI_INS_SA_ATTITUDE      25
 
+#if __GCC__
 #define M_PI        3.14159265358979323846
 #define M_PI_2      1.57079632679489661923
 #define M_PI_4      0.785398163397448309616
+#endif
 
 #define DEG_TO_RAD(angle)     ((angle)*M_PI/180.0)
 #define RAD_TO_DEG(angle)     ((angle)*180.0/M_PI)
