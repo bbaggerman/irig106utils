@@ -54,7 +54,7 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "B1"
+#define MAJOR_VERSION  "01"
 #define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
