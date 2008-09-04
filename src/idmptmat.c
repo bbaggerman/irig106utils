@@ -54,8 +54,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MAJOR_VERSION  "B1"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -281,7 +281,8 @@ void  vDumpRaw(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
     unsigned long    lChrIdx;
     char           * achBuff = pvBuff;
 
-    for (lChrIdx = 0; lChrIdx<psuI106Hdr->ulDataLen; lChrIdx++)
+    // Now dump TMATS after the CSDW
+    for (lChrIdx = 4; lChrIdx<psuI106Hdr->ulDataLen; lChrIdx++)
         fputc(achBuff[lChrIdx], ptOutFile);
 
     return;
