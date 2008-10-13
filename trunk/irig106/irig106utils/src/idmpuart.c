@@ -383,7 +383,7 @@ int main(int argc, char ** argv)
 
                     // Get the next UART message
                     enStatus = enI106_Decode_NextUartF0(&suUartMsg);
-                    } // end while processing 1553 messages from an IRIG packet
+                    } // end while processing UART messages from an IRIG packet
 
                 } // end if UART type and channel of interest
 
@@ -484,7 +484,7 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
 void vUsage(void)
     {
     printf("\nIDMPUART "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-    printf("Dump 1553 records from a Ch 10 data file\n");
+    printf("Dump UART records from a Ch 10 data file\n");
     printf("Freeware Copyright (C) 2008 Irig106.org\n\n");
     printf("Usage: idmpUART <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
