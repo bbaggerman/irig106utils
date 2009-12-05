@@ -77,8 +77,9 @@
 // 1553 channel counts
 typedef struct
     {
-    unsigned long       ulTotalIrigMsgs;
+    unsigned long       ulTotalIrigPackets;
     unsigned long       ulTotalBusMsgs;
+    unsigned long       ulTotalIrigPacketErrors;
     unsigned long       aulMsgs[0x4000];
     unsigned long       aulErrs[0x4000];
     unsigned long       ulErr1553Timeout;
@@ -140,6 +141,7 @@ int main(int argc, char ** argv)
     int                     bFoundFileStartTime = bFALSE;
     int                     bFoundDataStartTime = bFALSE;
     unsigned long           ulReadErrors;
+    unsigned long           ulBadPackets;
     unsigned long           ulTotal;
 
     FILE                  * ptOutFile;        // Output file handle
@@ -179,6 +181,7 @@ int main(int argc, char ** argv)
     memset(apsuChanInfo, 0, sizeof(apsuChanInfo));
     ulTotal      = 0L;
     ulReadErrors = 0L;
+    ulBadPackets = 0L;
 
 /*
  * Process the command line arguements
@@ -427,38 +430,48 @@ int main(int argc, char ** argv)
                         memset(apsuChanInfo[suI106Hdr.uChID]->psu1553Info, 0x00, sizeof(SuChanInfo1553));
                         }
 
-                    apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalIrigMsgs++;
+                    apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalIrigPackets++;
 
                     // Step through all 1553 messages
                     enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
-                    while (enStatus == I106_OK)
+                    if (enStatus == I106_OK)
                         {
-
-                        // Update message count
-                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalBusMsgs++;
-                        usPackedIdx = (su1553Msg.psuCmdWord1->uValue >> 5) & 0x3FFF;
-                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulMsgs[usPackedIdx]++;
-
-                        // Update the error counts
-                        if (su1553Msg.psu1553Hdr->bMsgError != 0) 
-                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulErrs[usPackedIdx]++;
-
-                        if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
-                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulErr1553Timeout++;
-
-                        // Get the next 1553 message
-                        enStatus = enI106_Decode_Next1553F1(&su1553Msg);
-                        }
-
-                        // If logging RT to RT then do it for second command word
-                        if (su1553Msg.psu1553Hdr->bRT2RT == 1)
-                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->bRT2RTFound = bTRUE;
-
-                        if (m_bLogRT2RT==bTRUE) 
+                        while (enStatus == I106_OK)
                             {
-                            usPackedIdx = (su1553Msg.psuCmdWord2->uValue >> 5) & 0x3FFF;
+                            // Update message count
+                            apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalBusMsgs++;
+                            usPackedIdx = (su1553Msg.psuCmdWord1->uValue >> 5) & 0x3FFF;
                             apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulMsgs[usPackedIdx]++;
-                        } // end if logging RT to RT
+
+                            // Update the error counts
+                            if (su1553Msg.psu1553Hdr->bMsgError != 0) 
+                                apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulErrs[usPackedIdx]++;
+
+                            if (su1553Msg.psu1553Hdr->bRespTimeout != 0)
+                                apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulErr1553Timeout++;
+
+                            // If logging RT to RT then do it for second command word
+                            if (su1553Msg.psu1553Hdr->bRT2RT == 1)
+                                {
+                                apsuChanInfo[suI106Hdr.uChID]->psu1553Info->bRT2RTFound = bTRUE;
+
+                                if (m_bLogRT2RT==bTRUE) 
+                                    {
+                                    usPackedIdx = (su1553Msg.psuCmdWord2->uValue >> 5) & 0x3FFF;
+                                    apsuChanInfo[suI106Hdr.uChID]->psu1553Info->aulMsgs[usPackedIdx]++;
+                                    } // end if logging RT to RT
+                                } // end if RT to RT
+
+                            // Get the next 1553 message
+                            enStatus = enI106_Decode_Next1553F1(&su1553Msg);
+                            } // end while I106_OK
+                        } // end if Decode First 1553 OK
+
+                    // Decode not good so mark it as a packet error
+                    else
+                        {
+                        apsuChanInfo[suI106Hdr.uChID]->psu1553Info->ulTotalIrigPacketErrors++;
+                        }
 
                     break;
 
@@ -599,9 +612,10 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
                 fprintf(ptOutFile,"    Some transmit RTs may not be shown\n");
             } // end if RT to RT
 
-        fprintf(ptOutFile,"    Totals - %ld Message in %ld IRIG Records\n",
+        fprintf(ptOutFile,"    Totals - %ld Message in %ld good IRIG packets, %ld bad packets\n",
             psuChanInfo->psu1553Info->ulTotalBusMsgs,
-            psuChanInfo->psu1553Info->ulTotalIrigMsgs);
+            psuChanInfo->psu1553Info->ulTotalIrigPackets,
+            psuChanInfo->psu1553Info->ulTotalIrigPacketErrors);
         } // end if 1553 messages
 
     if (psuChanInfo->ulPCM != 0)
@@ -635,7 +649,7 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
-    int                     iRDsiIndex;
+//    int                     iRDsiIndex;
     SuGDataSource         * psuGDataSource;
     SuRRecord             * psuRRecord;
     SuRDataSource         * psuRDataSource;
@@ -669,8 +683,8 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
             psuRDataSource = psuRRecord->psuFirstDataSource;
             do  {
                 if (psuRDataSource == NULL) break;
-                iRDsiIndex = psuRDataSource->iDataSourceNum;
-                fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
+//                iRDsiIndex = psuRDataSource->iDataSourceNum;
+                fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
                 fprintf(ptOutFile,"  %-12s", psuRDataSource->szChannelDataType);
                 fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                 fprintf(ptOutFile,"\n");
@@ -697,6 +711,7 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[])
 //    unsigned char       u1553ChanIdx;
     SuRRecord         * psuRRecord;
     SuRDataSource     * psuRDataSrc;
+    int                 iTrackNumber;
 
     // Find channels mentioned in TMATS record
     psuRRecord   = psuTmatsInfo->psuFirstRRecord;
@@ -706,18 +721,20 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[])
         psuRDataSrc = psuRRecord->psuFirstDataSource;
         while (psuRDataSrc != NULL)
             {
+            iTrackNumber = atoi(psuRDataSrc->szTrackNumber);
+
             // Make sure a message count structure exists
-            if (apsuChanInfo[psuRDataSrc->iTrackNumber] == NULL)
+            if (apsuChanInfo[iTrackNumber] == NULL)
                 {
 // SOMEDAY PROBABLY WANT TO HAVE DIFFERENT COUNT STRUCTURES FOR EACH CHANNEL TYPE
-                apsuChanInfo[psuRDataSrc->iTrackNumber] = malloc(sizeof(SuChanInfo));
-                memset(apsuChanInfo[psuRDataSrc->iTrackNumber], 0, sizeof(SuChanInfo));
-                apsuChanInfo[psuRDataSrc->iTrackNumber]->iChanID = psuRDataSrc->iTrackNumber;
+                apsuChanInfo[iTrackNumber] = malloc(sizeof(SuChanInfo));
+                memset(apsuChanInfo[iTrackNumber], 0, sizeof(SuChanInfo));
+                apsuChanInfo[iTrackNumber]->iChanID = iTrackNumber;
                 }
 
             // Now save channel type and name
-            strcpy(apsuChanInfo[psuRDataSrc->iTrackNumber]->szChanType, psuRDataSrc->szChannelDataType);
-            strcpy(apsuChanInfo[psuRDataSrc->iTrackNumber]->szChanName, psuRDataSrc->szDataSourceID);
+            strcpy(apsuChanInfo[iTrackNumber]->szChanType, psuRDataSrc->szChannelDataType);
+            strcpy(apsuChanInfo[iTrackNumber]->szChanName, psuRDataSrc->szDataSourceID);
 
             // Get the next R record data source
             psuRDataSrc = psuRDataSrc->psuNextRDataSource;
