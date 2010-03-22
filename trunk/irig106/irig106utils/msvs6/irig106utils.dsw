@@ -63,6 +63,33 @@ Package=<4>
 
 ###############################################################################
 
+Project: "idmp429"=.\idmp429.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "idmpeth"=.\idmpeth.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name irig106
+    End Project Dependency
+}}}
+
+###############################################################################
+
 Project: "idmpins"=.\idmpins.dsp - Package Owner=<4>
 
 Package=<5>
@@ -108,7 +135,7 @@ Package=<4>
 
 ###############################################################################
 
-Project: "irig106"=..\irig106lib\msvs6\irig106.dsp - Package Owner=<4>
+Project: "irig106"=..\..\irig106lib\msvs6\irig106.dsp - Package Owner=<4>
 
 Package=<5>
 {{{
