@@ -348,7 +348,7 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile)
                 iRDsiIndex = psuRDataSource->iDataSourceNum;
                 fprintf(ptOutFile, "      (R-%i\\DSI-%i) Data Source ID - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szDataSourceID);
                 fprintf(ptOutFile, "      (R-%i\\DST-%i) Channel Type   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szChannelDataType);
-                fprintf(ptOutFile, "      (R-%i\\TK1-%i) Track Number   - %i\n", iRIndex, iRDsiIndex, psuRDataSource->iTrackNumber);
+                fprintf(ptOutFile, "      (R-%i\\TK1-%i) Track Number   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szTrackNumber);
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 
@@ -372,7 +372,7 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
     EnI106Status            enStatus;
     int                     iGIndex;
     int                     iRIndex;
-    int                     iRDsiIndex;
+//    int                     iRDsiIndex;
     SuTmatsInfo             suTmatsInfo;
     SuGDataSource         * psuGDataSource;
     SuRRecord             * psuRRecord;
@@ -414,8 +414,8 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * ptOutFile
             psuRDataSource = psuRRecord->psuFirstDataSource;
             do  {
                 if (psuRDataSource == NULL) break;
-                iRDsiIndex = psuRDataSource->iDataSourceNum;
-                fprintf(ptOutFile, " %5i ",   psuRDataSource->iTrackNumber);
+//                iRDsiIndex = psuRDataSource->iDataSourceNum;
+                fprintf(ptOutFile, " %5s ",   psuRDataSource->szTrackNumber);
                 fprintf(ptOutFile, "  %-12s", psuRDataSource->szChannelDataType);
                 fprintf(ptOutFile, "  %-8s",  psuRDataSource->bEnabled ? "Enabled" : "Disabled");
                 fprintf(ptOutFile, "  %-20s", psuRDataSource->szDataSourceID);
