@@ -381,7 +381,7 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
-    int                     iRDsiIndex;
+//    int                     iRDsiIndex;
     SuGDataSource         * psuGDataSource;
     SuRRecord             * psuRRecord;
     SuRDataSource         * psuRDataSource;
@@ -418,8 +418,8 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"VIDIN") == 0)
                     {
-                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
+//                    iRDsiIndex = psuRDataSource->iDataSourceNum;
+                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
                     fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                     fprintf(ptOutFile,"\n");
                     }
