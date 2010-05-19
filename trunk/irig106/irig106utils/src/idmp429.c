@@ -314,6 +314,22 @@ int main(int argc, char ** argv)
             if (enStatus != I106_OK)
                 break;
 
+            // If IRIG time message then process it
+            if (suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME)
+                {
+                // Make sure our buffer is big enough, size *does* matter
+                if (ulBuffSize < suI106Hdr.ulPacketLen)
+                    {
+                    pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                    ulBuffSize = suI106Hdr.ulPacketLen;
+                    }
+
+                // Read the data buffer and decode time
+                enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
+                enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
+                enI106_SetRelTime(m_iI106Handle, &suTime, suI106Hdr.aubyRefTime);
+                }
+
             // If ARINC 429 message then process it
             if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_ARINC_429_FMT_0) &&
                 ((iChannel == -1) || (iChannel == (int)suI106Hdr.uChID)))
@@ -346,18 +362,13 @@ int main(int argc, char ** argv)
                     if ((iBus == -1) || (iBus == (int)suArinc429Msg.psu429Hdr->uBusNum))
                         {
                         // Print out the time
-
-                        // PROBABLY REALLY OUGHT TO CHECK FOR THAT GOOFY SECONDARY
-                        // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
                         enI106_RelInt2IrigTime(m_iI106Handle, suArinc429Msg.llIntPktTime, &suTime);
-                        szTime = ctime((time_t *)&suTime.ulSecs);
-					    szTime[19] = '\0';
-					    iMilliSec = (int)(suTime.ulFrac / 10000.0);
-                        fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+                        szTime = IrigTime2String(&suTime);
+                        fprintf(ptOutFile,"%s", szTime);
 
                         // Print out the data
-                        fprintf(ptOutFile," %5.1u",  suI106Hdr.uChID);
-                        fprintf(ptOutFile," %3.1u",  suArinc429Msg.psu429Hdr->uBusNum);
+                        fprintf(ptOutFile," %5.1u",   suI106Hdr.uChID);
+                        fprintf(ptOutFile," %3.1u",   suArinc429Msg.psu429Hdr->uBusNum);
                         fprintf(ptOutFile," %3.1u",   suArinc429Msg.psu429Data->uLabel);
                         fprintf(ptOutFile," %1.1u",   suArinc429Msg.psu429Data->uSDI);
                         fprintf(ptOutFile," 0x%5.5x", suArinc429Msg.psu429Data->uData);

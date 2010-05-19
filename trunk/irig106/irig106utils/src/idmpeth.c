@@ -326,6 +326,22 @@ int main(int argc, char ** argv)
             if (enStatus != I106_OK)
                 break;
 
+            // If IRIG time message then process it
+            if (suI106Hdr.ubyDataType == I106CH10_DTYPE_IRIG_TIME)
+                {
+                // Make sure our buffer is big enough, size *does* matter
+                if (ulBuffSize < suI106Hdr.ulPacketLen)
+                    {
+                    pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                    ulBuffSize = suI106Hdr.ulPacketLen;
+                    }
+
+                // Read the data buffer and decode time
+                enStatus = enI106Ch10ReadData(m_iI106Handle, ulBuffSize, pvBuff);
+                enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
+                enI106_SetRelTime(m_iI106Handle, &suTime, suI106Hdr.aubyRefTime);
+                }
+
             // If ethernet message then process it
             if ((suI106Hdr.ubyDataType == I106CH10_DTYPE_ETHERNET_FMT_0) &&
                 ((iChannel == -1) || (iChannel == (int)suI106Hdr.uChID)))
@@ -353,12 +369,20 @@ int main(int argc, char ** argv)
                 enStatus = enI106_Decode_FirstEthernetF0(&suI106Hdr, pvBuff, &suEthMsg);
                 while (enStatus == I106_OK)
                     {
+#if 0
                     enI106_Rel2IrigTime(m_iI106Handle,
                         suEthMsg.psuEthernetF0Hdr->aubyIntPktTime, &suTime);
                     szTime = ctime((time_t *)&suTime.ulSecs);
 					szTime[19] = '\0';
 					iMilliSec = (int)(suTime.ulFrac / 10000.0);
                     fprintf(m_ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+#else
+                    // Print out the time
+                    enI106_Rel2IrigTime(m_iI106Handle,
+                        suEthMsg.psuEthernetF0Hdr->aubyIntPktTime, &suTime);
+                    szTime = IrigTime2String(&suTime);
+                    fprintf(m_ptOutFile,"%s", szTime);
+#endif
 
                     if ((suEthMsg.psuChanSpec->uFormat       == I106_ENET_FMT_PHYSICAL   ) &&
                         (suEthMsg.psuEthernetF0Hdr->uContent == I106_ENET_CONTENT_FULLMAC))
