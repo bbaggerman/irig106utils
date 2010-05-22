@@ -3,10 +3,10 @@
 # ---------------------------------------------------------------------------
 
 SRC_DIR=../src
-CFLAGS=-I../../irig106lib/src -I- -g
+CFLAGS=-I../../irig106lib/src -I- -ggdb -fpack-struct=1
 LIBS=../../irig106lib/gcc/libirig106.a
 
-all: i106stat i106trim i106vid idmptmat idmp1553 idmpins idmpuart
+all: i106stat i106trim i106vid idmptmat idmp1553 idmpins idmpuart idmpeth idmp429
 
 i106stat: $(SRC_DIR)/i106stat.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -o $@
@@ -29,4 +29,9 @@ idmpins: $(SRC_DIR)/idmpins.c $(LIBS)
 idmpuart: $(SRC_DIR)/idmpuart.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -lm -o $@
 
+idmpeth: $(SRC_DIR)/idmpeth.c $(LIBS)
+	cc $(CFLAGS) $< $(LIBS) -lm -o $@
+
+idmp429: $(SRC_DIR)/idmp429.c $(LIBS)
+	cc $(CFLAGS) $< $(LIBS) -lm -o $@
 
