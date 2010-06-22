@@ -59,8 +59,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MAJOR_VERSION  "F1"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -656,12 +656,22 @@ int main (int argc, char *argv[])
                 enStatus = enI106_Decode_First1553F1(&suI106Hdr, pvBuff, &su1553Msg);
                 while (enStatus == I106_OK)
                     {
+                    SuCmdWordU   * psuCmdWord;
 
                      // Look for INS packets
-                    if ((su1553Msg.psuCmdWord1->suStruct.uRTAddr  == uRTAddr ) &&
-                        (su1553Msg.psuCmdWord1->suStruct.bTR      == uTR     ) &&
-                        (su1553Msg.psuCmdWord1->suStruct.uSubAddr == uSubAddr) &&
-                        (i1553WordCnt(su1553Msg.psuCmdWord1)      >= 24 ))
+                    if ((!su1553Msg.psu1553Hdr->bRT2RT) || (uTR == 0))
+                        psuCmdWord = su1553Msg.psuCmdWord1;
+                    else
+                        psuCmdWord = su1553Msg.psuCmdWord2;
+
+                    if ((psuCmdWord->suStruct.uRTAddr  == uRTAddr ) &&
+                        (psuCmdWord->suStruct.bTR      == uTR     ) &&
+                        (psuCmdWord->suStruct.uSubAddr == uSubAddr) &&
+                        (i1553WordCnt(psuCmdWord)      >= 1      ))
+                    //if ((su1553Msg.psuCmdWord1->suStruct.uRTAddr  == uRTAddr ) &&
+                    //    (su1553Msg.psuCmdWord1->suStruct.bTR      == uTR     ) &&
+                    //    (su1553Msg.psuCmdWord1->suStruct.uSubAddr == uSubAddr) &&
+                    //    (i1553WordCnt(su1553Msg.psuCmdWord1)      >= 24 ))
                         {
 
                         // Decode INS data
