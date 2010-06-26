@@ -66,12 +66,34 @@
 #define bFALSE  (1==0)
 #endif
 
+#define CR      (13)
+#define LF      (10)
+
 
 /*
  * Data structures
  * ---------------
  */
 
+typedef struct
+    {
+    char        szUTC[10];
+    } SuNmeaGPGGA;
+
+
+
+typedef struct
+    {
+    char        szUTC[10];
+    } SuNmeaGPRMC;
+
+
+
+typedef struct
+    {
+    SuNmeaGPGGA     suNmeaGPGGA;
+    SuNmeaGPRMC     suNmeaGPRCM;
+    } SuNmeaInfo;
 
 /*
  * Module data
@@ -90,6 +112,8 @@ int           m_iI106Handle;
  */
 
 void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+int  iDecodeNmea(char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo);
+
 void vUsage(void);
 
 
@@ -108,7 +132,6 @@ int main(int argc, char ** argv)
     long                    lUartMsgs = 0;
     int                     bVerbose;
     int                     bString;
-    int                     bWasPrintable;
     int                     iWordIdx;
 
     int                     bPrintTMATS;
@@ -121,8 +144,11 @@ int main(int argc, char ** argv)
     SuUartF0_CurrMsg        suUartMsg;
     SuTmatsInfo             suTmatsInfo;
 
-    char                  * pchNmeaBuff
-    int                     iNmeaBuffLen = 0;
+    char                  * pchNmeaBuff;
+    int                     iNmeaBuffLen = 1000;
+    int                     iNmeaBuffIdx;
+    SuNmeaInfo              suNmeaInfo;
+    int                     iStatus;
 
 /*
  * Process the command line arguements
@@ -302,6 +328,9 @@ int main(int argc, char ** argv)
 
     lMsgs = 1;
 
+    // Get some memory for the NMEA string buffer
+    pchNmeaBuff = (char *)malloc(iNmeaBuffLen);
+
     while (1==1) 
         {
 
@@ -350,22 +379,51 @@ int main(int argc, char ** argv)
 //                    fprintf(ptOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
 
                     // Copy UART data to holding buffer
+                    for (iWordIdx=0; iWordIdx<suUartMsg.psuUartHdr->uDataLength; iWordIdx++) 
+                        {
+                        // If end of line then check buffer for message
+                        if ((suUartMsg.pauData[iWordIdx] == CR) ||
+                            (suUartMsg.pauData[iWordIdx] == LF))
+                            {
+                            // Null terminate the string
+                            pchNmeaBuff[iNmeaBuffIdx] = '\0';
 
+                            // Decode it if there is anything there
+                            if (iNmeaBuffIdx != 0)
+                                iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
 
-                    // If we have a complete NMEA message then decode it
+                            // Get setup for a new message
+                            pchNmeaBuff[0] = '\0';
+                            iNmeaBuffIdx = 0;
+                            } // end if CR or LF was found
 
+                        // If beginning of new message then check buffer for message
+                        else if (suUartMsg.pauData[iWordIdx] == '$')
+                            {
+                            // Null terminate the string
+                            pchNmeaBuff[iNmeaBuffIdx] = '\0';
+
+                            // Decode it if there is anything there
+                            if (iNmeaBuffIdx != 0)
+                                iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
+
+                            // Store the beginning of the new message
+                            pchNmeaBuff[0] = suUartMsg.pauData[iWordIdx];
+                            iNmeaBuffIdx = 1;
+
+                            } // end if new message found
+
+                        } // end for all char in UART message
+
+                    // Some broken recorder implementation strip the CR/LF so need to check
+                    // at the end of the UART message
+                    if (iNmeaBuffIdx != 0)
+                        iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
 
                         // Copy decoded data to holding structure
 
                         // If time is new then print out previous data
 
-
-                    // Print out the data
-                    fprintf(ptOutFile," Chan%d-%d",suI106Hdr.uChID, suUartMsg.psuUartHdr->uSubchannel);
-                    bWasPrintable = bFALSE;
-                    for (iWordIdx=0; iWordIdx<suUartMsg.psuUartHdr->uDataLength; iWordIdx++) 
-                        {
-                        }
 
                     fprintf(ptOutFile,"\n");
                     fflush(ptOutFile);
@@ -493,10 +551,13 @@ void vUsage(void)
 
 
 
+/* ------------------------------------------------------------------------ */
 
+int  iDecodeNmea(char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
+    {
 
-
-
+    return 1;
+    }
 
 /*
 GPGGA Sentence format
