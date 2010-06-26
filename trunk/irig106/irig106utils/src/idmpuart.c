@@ -111,6 +111,7 @@ int main(int argc, char ** argv)
     int                     iWordIdx;
 
     int                     bPrintTMATS;
+    int                     bPrintRTC;
     unsigned long           ulBuffSize = 0L;
 
     EnI106Status            enStatus;
@@ -136,6 +137,7 @@ int main(int argc, char ** argv)
     bVerbose        = bFALSE;            // No verbosity
     bString         = bFALSE;
     bPrintTMATS     = bFALSE;
+    bPrintRTC       = bFALSE;
 
     szInFile[0]  = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
@@ -163,6 +165,10 @@ int main(int argc, char ** argv)
 
                     case 'T' :                   // Print TMATS flag
                         bPrintTMATS = bTRUE;
+                        break;
+
+                    case 'R' :                   // Print relative time counter
+                        bPrintRTC = bTRUE;
                         break;
 
                     default :
@@ -337,8 +343,15 @@ int main(int argc, char ** argv)
                 while (enStatus == I106_OK)
                     {
 
-                    enI106_RelInt2IrigTime(m_iI106Handle, suUartMsg.suTimeRef.uRelTime, &suUartMsg.suTimeRef.suIrigTime);
-                    fprintf(ptOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
+                    if (bPrintRTC == bFALSE)
+                        {
+                        enI106_RelInt2IrigTime(m_iI106Handle, suUartMsg.suTimeRef.uRelTime, &suUartMsg.suTimeRef.suIrigTime);
+                        fprintf(ptOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
+                        }
+                    else
+                        {
+                        fprintf(ptOutFile,"%14lld ", suUartMsg.suTimeRef.uRelTime);
+                        }
 
                     // Print out the data
                     fprintf(ptOutFile," Chan%d-%d",suI106Hdr.uChID, suUartMsg.psuUartHdr->uSubchannel);
@@ -491,6 +504,7 @@ void vUsage(void)
     printf("   -v         Verbose                        \n");
     printf("   -c ChNum   Channel Number (default all)   \n");
     printf("   -s         Print out data as ASCII string \n");
+    printf("   -R         Print Relative Time Counter    \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
     printf("The output data fields are:                  \n");
