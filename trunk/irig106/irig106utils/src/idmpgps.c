@@ -75,22 +75,29 @@
  * ---------------
  */
 
+// Hold GPGGA data
 typedef struct
     {
-    char        szUTC[10];
+    int         bValid;
+    float       fLatitude;      // Latitude
+    float       fLongitude;     // Longitude
+    float       fFixQuality;    // Fix quality
+    int         iNumSats;       // Number of satellites
+    float       fHDOP;          // HDOP
+    float       fAltitude;      // Altitude MSL (meters)
+    float       fHAE;           // Height above WGS84 ellipsoid (meters)
     } SuNmeaGPGGA;
 
-
-
+// Hold GPRMC data
 typedef struct
     {
-    char        szUTC[10];
+    int         bValid;
     } SuNmeaGPRMC;
 
-
-
+// Hold all data for a particular time
 typedef struct
     {
+    int             iSeconds;       // Seconds since midnight of these messages
     SuNmeaGPGGA     suNmeaGPGGA;
     SuNmeaGPRMC     suNmeaGPRCM;
     } SuNmeaInfo;
@@ -112,7 +119,11 @@ int           m_iI106Handle;
  */
 
 void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
-int  iDecodeNmea(char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo);
+
+void ClearNmeaInfo(SuNmeaInfo * psuNmeaInfo);
+int  iDecodeNmeaTime(const char * szNmea);
+int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo);
+void DisplayData(SuNmeaInfo * psuNmeaInfo);
 
 void vUsage(void);
 
@@ -128,8 +139,9 @@ int main(int argc, char ** argv)
     FILE                  * ptOutFile;          // Output file handle
 
     int                     iChannel;           // Channel number
-    unsigned long           lMsgs = 0;          // Total message
-    long                    lUartMsgs = 0;
+    unsigned long           lMsgs = 0L;         // Total message
+//    long                    lUartMsgs = 0L;
+    long                    lGpsPoints = 0L;
     int                     bVerbose;
     int                     bString;
     int                     iWordIdx;
@@ -146,10 +158,11 @@ int main(int argc, char ** argv)
 
     char                  * pchNmeaBuff;
     int                     iNmeaBuffLen = 1000;
-    int                     iNmeaBuffIdx;
+    int                     iNmeaBuffIdx = 0;
     SuNmeaInfo              suNmeaInfo;
-    int                     iStatus;
+    int                     bDecodeStatus;
 
+    int                     iSeconds;
 /*
  * Process the command line arguements
  */
@@ -328,6 +341,8 @@ int main(int argc, char ** argv)
 
     lMsgs = 1;
 
+    ClearNmeaInfo(&suNmeaInfo);
+
     // Get some memory for the NMEA string buffer
     pchNmeaBuff = (char *)malloc(iNmeaBuffLen);
 
@@ -388,9 +403,18 @@ int main(int argc, char ** argv)
                             // Null terminate the string
                             pchNmeaBuff[iNmeaBuffIdx] = '\0';
 
+                            // If the time changed then output the data
+                            iSeconds = iDecodeNmeaTime(pchNmeaBuff);
+                            if ((iSeconds != -1) &&
+                                (iSeconds != suNmeaInfo.iSeconds))
+                                {
+                                DisplayData(&suNmeaInfo);
+                                ClearNmeaInfo(&suNmeaInfo);
+                                }
+
                             // Decode it if there is anything there
                             if (iNmeaBuffIdx != 0)
-                                iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
+                                bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
 
                             // Get setup for a new message
                             pchNmeaBuff[0] = '\0';
@@ -403,9 +427,18 @@ int main(int argc, char ** argv)
                             // Null terminate the string
                             pchNmeaBuff[iNmeaBuffIdx] = '\0';
 
+                            // If the time changed then output the data
+                            iSeconds = iDecodeNmeaTime(pchNmeaBuff);
+                            if ((iSeconds != -1) &&
+                                (iSeconds != suNmeaInfo.iSeconds))
+                                {
+                                DisplayData(&suNmeaInfo);
+                                ClearNmeaInfo(&suNmeaInfo);
+                                }
+
                             // Decode it if there is anything there
                             if (iNmeaBuffIdx != 0)
-                                iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
+                                bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
 
                             // Store the beginning of the new message
                             pchNmeaBuff[0] = suUartMsg.pauData[iWordIdx];
@@ -413,23 +446,48 @@ int main(int argc, char ** argv)
 
                             } // end if new message found
 
+                        // Else just copy the character to the buffer, but only if we've
+                        // already found the beginning of a message
+                        else
+                            {
+                            if (pchNmeaBuff[0] == '$')
+                                {
+                                pchNmeaBuff[iNmeaBuffIdx] = suUartMsg.pauData[iWordIdx];
+                                iNmeaBuffIdx++;
+                                }
+                            } // else just copy character to buffer
+
                         } // end for all char in UART message
 
                     // Some broken recorder implementation strip the CR/LF so need to check
                     // at the end of the UART message
                     if (iNmeaBuffIdx != 0)
-                        iStatus = iDecodeNmea(pchNmeaBuff, &suNmeaInfo);
+                        {
+                        // Null terminate the string
+                        pchNmeaBuff[iNmeaBuffIdx] = '\0';
 
-                        // Copy decoded data to holding structure
+                        // If the time changed then output the data
+                        iSeconds = iDecodeNmeaTime(pchNmeaBuff);
+                        if ((iSeconds != -1) &&
+                            (iSeconds != suNmeaInfo.iSeconds))
+                            {
+                            DisplayData(&suNmeaInfo);
+                            ClearNmeaInfo(&suNmeaInfo);
+                            }
 
-                        // If time is new then print out previous data
+                        // Try to decode
+                        bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
 
+                        // If something decoded then reset NMEA buffer
+                        if (bDecodeStatus == bTRUE)
+                            {
+                            pchNmeaBuff[0] = '\0';
+                            iNmeaBuffIdx = 0;
+                            }
+                        } // end if buffer not empty
 
-                    fprintf(ptOutFile,"\n");
-                    fflush(ptOutFile);
-
-                    lUartMsgs++;
-                    if (bVerbose) printf("%8.8ld UART Messages \r",lUartMsgs);
+                    lGpsPoints++;
+                    if (bVerbose) printf("%8.8ld GPS Points \r",lGpsPoints);
 
                     // Get the next UART message
                     enStatus = enI106_Decode_NextUartF0(&suUartMsg);
@@ -454,7 +512,6 @@ int main(int argc, char ** argv)
 
     printf("\nTotal Message %lu\n", lMsgs);
 
-
 /*
  *  Close files
  */
@@ -473,7 +530,6 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
-//    int                     iRDsiIndex;
     SuGDataSource         * psuGDataSource;
     SuRRecord             * psuRRecord;
     SuRDataSource         * psuRDataSource;
@@ -510,7 +566,6 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"UARTIN") == 0)
                     {
-//                    iRDsiIndex = psuRDataSource->iDataSourceNum;
                     fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
                     fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                     fprintf(ptOutFile,"\n");
@@ -533,18 +588,16 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
 
 void vUsage(void)
     {
-    printf("\nIDMPUART "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-    printf("Dump UART records from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2008 Irig106.org\n\n");
-    printf("Usage: idmpUART <input file> <output file> [flags]\n");
+    printf("\nIDMPGPS "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Dump GPS position from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
+    printf("Usage: idmpgps <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");
     printf("   -c ChNum   Channel Number (default all)   \n");
-    printf("   -s         Print out data as ASCII string \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
     printf("The output data fields are:                  \n");
-    printf("  Time Chan-Subchan Data...                  \n");
     printf("                                             \n");
     }
 
@@ -553,69 +606,295 @@ void vUsage(void)
 
 /* ------------------------------------------------------------------------ */
 
-int  iDecodeNmea(char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
+// Clear out all NMEA info and get ready for a new set of messages
+void ClearNmeaInfo(SuNmeaInfo * psuNmeaInfo)
     {
+    memset(psuNmeaInfo, 0, sizeof(SuNmeaInfo));
+    psuNmeaInfo->iSeconds = -1;
 
-    return 1;
+    return;
     }
 
-/*
-GPGGA Sentence format
 
+
+/* ------------------------------------------------------------------------ */
+
+// Take a peak at the NMEA sentence and return the number of seconds since midnight
+int  iDecodeNmeaTime(const char * szNmea)
+    {
+    char    szLocalNmeaBuff[1000];
+    char  * szNmeaType;
+    char  * szNmeaTime;
+    int     iTokens;
+    int     iSeconds;
+    int     iHour;
+    int     iMin;
+    int     iSec;
+
+    // Make a local copy of the string because strtok() inserts nulls
+    strcpy(szLocalNmeaBuff, szNmea);
+
+    // Get the first field (NMEA Sentence Type)
+    szNmeaType = strtok(szLocalNmeaBuff, ",");
+
+    // If we got no sentence type then return error
+    if (szNmeaType == NULL)
+        return -1;
+
+    // Figure out what kind of sentence and then find the time
+    if ((strcmp(szNmeaType, "$GPGGA") == 0) ||
+        (strcmp(szNmeaType, "$GPRMC") == 0))
+        {
+        szNmeaTime = strtok(NULL,",");
+        if (szNmeaTime == NULL)
+            return -1;
+        else
+            {
+            iTokens = sscanf(szNmeaTime, "%2d%2d%2d", &iHour, &iMin, &iSec);
+            if (iTokens != 3)
+                return -1;
+            iSeconds = iHour*3600 + iMin*60 + iSec;
+            } // end if time string found
+        } // end if GPGGA or GPRMC
+
+    return iSeconds;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+// Figure out what kind of message and decode the fields
+int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
+    {
+    char    szLocalNmeaBuff[1000];
+    char  * szNmeaType;
+    char  * szTemp;
+    int     iTokens;
+    int     iSeconds;
+    int     iHour;
+    int     iMin;
+    int     iSec;
+
+    // Make a local copy of the string because strtok() inserts nulls
+    strcpy(szLocalNmeaBuff, szNmeaMsg);
+
+    // Get the first field (NMEA Sentence Type)
+    szNmeaType = strtok(szLocalNmeaBuff, ",");
+
+    // If we got no sentence type then return error
+    if (szNmeaType == NULL)
+        return -1;
+
+    // Check the checksum checkchars checksum sum
+    // SOMEDAY
+
+/*
 $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M, ,*47
-   |   |	  |			 |			 | |  |	  |		  |      | | 
-   |   |	  |			 |			 | |  |	  |		  |		 | checksum data
-   |   |	  |			 |			 | |  |	  |		  |		 |
-   |   |	  |			 |			 | |  |	  |		  |		 empty field
-   |   |	  |			 |			 | |  |	  |		  |
-   |   |	  |			 |			 | |  |	  |		  46.9,M Height of geoid (m) above WGS84 ellipsoid
-   |   |	  |			 |			 | |  |	  |
-   |   |	  |			 |			 | |  |	  545.4,M Altitude (m) above mean sea level
-   |   |	  |			 |			 | |  |
-   |   |	  |			 |			 | |  0.9 Horizontal dilution of position (HDOP)
-   |   |	  |			 |			 | |
-   |   |	  |			 |			 | 08 Number of satellites being tracked
-   |   |	  |			 |			 |
-   |   |	  |			 |			 1 Fix quality:	0 = invalid
-   |   |	  |			 |							1 = GPS fix (SPS)
-   |   |	  |			 |							2 = DGPS fix
-   |   |	  |			 |							3 = PPS fix
-   |   |	  |			 |							4 = Real Time Kinematic
-   |   |	  |			 |							5 = Float RTK
-   |   |	  |			 |							6 = estimated (dead reckoning) (2.3 feature)
-   |   |	  |			 |							7 = Manual input mode
-   |   |	  |			 |							8 = Simulation mode
-   |   |	  |			 |
-   |   |	  |			 01131.000,E Longitude 11 deg 31.000' E
-   |   |	  |
-   |   |	  4807.038,N Latitude 48 deg 07.038' N	
+   |   |      |          |           | |  |   |       |      | | 
+   |   |      |          |           | |  |   |       |      | checksum data
+   |   |      |          |           | |  |   |       |      |
+   |   |      |          |           | |  |   |       |      empty field
+   |   |      |          |           | |  |   |       |
+   |   |      |          |           | |  |   |       46.9,M Height of geoid (m) above WGS84 ellipsoid
+   |   |      |          |           | |  |   |
+   |   |      |          |           | |  |   545.4,M Altitude (m) above mean sea level
+   |   |      |          |           | |  |
+   |   |      |          |           | |  0.9 Horizontal dilution of position (HDOP)
+   |   |      |          |           | |
+   |   |      |          |           | 08 Number of satellites being tracked
+   |   |      |          |           |
+   |   |      |          |           1 Fix quality: 0 = invalid
+   |   |      |          |                          1 = GPS fix (SPS)
+   |   |      |          |                          2 = DGPS fix
+   |   |      |          |                          3 = PPS fix
+   |   |      |          |                          4 = Real Time Kinematic
+   |   |      |          |                          5 = Float RTK
+   |   |      |          |                          6 = estimated (dead reckoning) (2.3 feature)
+   |   |      |          |                          7 = Manual input mode
+   |   |      |          |                          8 = Simulation mode
+   |   |      |          |
+   |   |      |          01131.000,E Longitude 11 deg 31.000' E
+   |   |      |
+   |   |      4807.038,N Latitude 48 deg 07.038' N  
    |   |
    |   123519 Fix taken at 12:35:19 UTC
    |
    GGA Global Positioning System Fix Data
-
-  $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
-	 |	 |		| |			 |			 |	   |	 |		|	   |
-	 |	 |		| |			 |			 |	   |	 |		|	   *6A Checksum data
-	 |	 |		| |			 |			 |	   |	 |		|
-	 |	 |		| |			 |			 |	   |	 |		003.1,W Magnetic Variation
-	 |	 |		| |			 |			 |	   |	 |
-	 |	 |		| |			 |			 |	   |	 230394 Date - 23rd of March 1994
-	 |	 |		| |			 |			 |	   |
-	 |	 |		| |			 |			 |	   084.4 Track angle in degrees
-	 |	 |		| |			 |			 |	   
-	 |	 |		| |			 |			 022.4 Speed over the ground in knots
-	 |	 |		| |			 |
-	 |	 |		| |			 01131.000,E Longitude 11 deg 31.000' E
-	 |	 |		| |
-	 |	 |		| 4807.038,N Latitude 48 deg 07.038' N
-	 |	 |		|
-	 |	 |		A Status A=active or V=Void
-	 |	 |
-	 |	 123519 Fix taken at 12:35:19 UTC
-	 |
-	 RMC Recommended Minimum sentence C
-
-
-
 */
+    if (strcmp(szNmeaType, "$GPGGA") == 0)
+        {
+        // Time
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Latitude
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Longitude
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Fix quality
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Number of satellites
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // HDOP
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Altitude MSL (meters)
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Height above WGS84 ellipsoid (meters)
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        } // end if GPGGA
+
+/*
+$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
+   |   |      | |          |           |     |     |      |      |
+   |   |      | |          |           |     |     |      |      *6A Checksum data
+   |   |      | |          |           |     |     |      |
+   |   |      | |          |           |     |     |      003.1,W Magnetic Variation
+   |   |      | |          |           |     |     |
+   |   |      | |          |           |     |     230394 Date - 23rd of March 1994
+   |   |      | |          |           |     |
+   |   |      | |          |           |     084.4 Track angle in degrees
+   |   |      | |          |           |     
+   |   |      | |          |           022.4 Speed over the ground in knots
+   |   |      | |          |
+   |   |      | |          01131.000,E Longitude 11 deg 31.000' E
+   |   |      | |
+   |   |      | 4807.038,N Latitude 48 deg 07.038' N
+   |   |      |
+   |   |      A Status A=active or V=Void
+   |   |
+   |   123519 Fix taken at 12:35:19 UTC
+   |
+   RMC Recommended Minimum sentence C
+*/
+    else if (strcmp(szNmeaType, "$GPRMC") == 0)
+        {
+char      szTemp1[100];
+char      szTemp2[100];
+char      szTemp3[100];
+char      szTemp4[100];
+char      szTemp5[100];
+char      szTemp6[100];
+char      szTemp7[100];
+char      szTemp8[100];
+char      szTemp9[100];
+char      szTemp10[100];
+char      szTemp11[100];
+
+//sscanf(szNmeaMsg, "%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,%s",
+//sscanf(szNmeaMsg, "%[^,]s",
+//sscanf(szNmeaMsg, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+sscanf(szNmeaMsg, "%[^,]s,%[^,]s,%[^,]s,%[^,]s",
+    szTemp1, szTemp2,  szTemp3,  szTemp4,  szTemp5,  szTemp6,  szTemp7,  szTemp8,  szTemp9,  szTemp10,  szTemp11);
+
+        // Time
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Status
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Latitude
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Longitude
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Speed
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Track
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Date
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        // Magnetic Variation
+        szTemp = strtok(NULL,",");
+        if (szTemp != NULL) 
+            {
+            }
+
+        } // end if GPRMC
+
+    return bTRUE;
+    }
+
+
+
+
+/* ------------------------------------------------------------------------ */
+
+void DisplayData(SuNmeaInfo * psuNmeaInfo)
+    {
+
+    return;
+    }
