@@ -124,6 +124,7 @@ void ClearNmeaInfo(SuNmeaInfo * psuNmeaInfo);
 int  iDecodeNmeaTime(const char * szNmea);
 int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo);
 void DisplayData(SuNmeaInfo * psuNmeaInfo);
+char * NmeaStrTok(char * szNmea, char * szTokens);
 
 void vUsage(void);
 
@@ -635,7 +636,7 @@ int  iDecodeNmeaTime(const char * szNmea)
     strcpy(szLocalNmeaBuff, szNmea);
 
     // Get the first field (NMEA Sentence Type)
-    szNmeaType = strtok(szLocalNmeaBuff, ",");
+    szNmeaType = NmeaStrTok(szLocalNmeaBuff, ",");
 
     // If we got no sentence type then return error
     if (szNmeaType == NULL)
@@ -645,7 +646,7 @@ int  iDecodeNmeaTime(const char * szNmea)
     if ((strcmp(szNmeaType, "$GPGGA") == 0) ||
         (strcmp(szNmeaType, "$GPRMC") == 0))
         {
-        szNmeaTime = strtok(NULL,",");
+        szNmeaTime = NmeaStrTok(NULL,",");
         if (szNmeaTime == NULL)
             return -1;
         else
@@ -670,17 +671,17 @@ int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
     char    szLocalNmeaBuff[1000];
     char  * szNmeaType;
     char  * szTemp;
-    int     iTokens;
-    int     iSeconds;
-    int     iHour;
-    int     iMin;
-    int     iSec;
+    //int     iTokens;
+    //int     iSeconds;
+    //int     iHour;
+    //int     iMin;
+    //int     iSec;
 
     // Make a local copy of the string because strtok() inserts nulls
     strcpy(szLocalNmeaBuff, szNmeaMsg);
 
     // Get the first field (NMEA Sentence Type)
-    szNmeaType = strtok(szLocalNmeaBuff, ",");
+    szNmeaType = NmeaStrTok(szLocalNmeaBuff, ",");
 
     // If we got no sentence type then return error
     if (szNmeaType == NULL)
@@ -690,11 +691,13 @@ int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
     // SOMEDAY
 
 /*
-$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M, ,*47
-   |   |      |          |           | |  |   |       |      | | 
-   |   |      |          |           | |  |   |       |      | checksum data
+$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,1.0,0000*47
+   |   |      |          |           | |  |   |       |      |   |    |
+   |   |      |          |           | |  |   |       |      |   |    47 Checksum
+   |   |      |          |           | |  |   |       |      |   | 
+   |   |      |          |           | |  |   |       |      |   0000 Differential reference station
    |   |      |          |           | |  |   |       |      |
-   |   |      |          |           | |  |   |       |      empty field
+   |   |      |          |           | |  |   |       |      1.0, Age of differential GPS data
    |   |      |          |           | |  |   |       |
    |   |      |          |           | |  |   |       46.9,M Height of geoid (m) above WGS84 ellipsoid
    |   |      |          |           | |  |   |
@@ -725,69 +728,97 @@ $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M, ,*47
     if (strcmp(szNmeaType, "$GPGGA") == 0)
         {
         // Time
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Latitude
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Longitude
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Fix quality
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Number of satellites
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // HDOP
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Altitude MSL (meters)
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Height above WGS84 ellipsoid (meters)
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Age of differential GPS data
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Differential reference station
+        szTemp = NmeaStrTok(NULL,"*");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Checksum
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         } // end if GPGGA
 
 /*
-$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
-   |   |      | |          |           |     |     |      |      |
-   |   |      | |          |           |     |     |      |      *6A Checksum data
+$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
+   |   |      | |          |           |     |     |      |       | |
+   |   |      | |          |           |     |     |      |       | *6A Checksum data
+   |   |      | |          |           |     |     |      |       |
+   |   |      | |          |           |     |     |      |       A Mode Indicator
    |   |      | |          |           |     |     |      |
    |   |      | |          |           |     |     |      003.1,W Magnetic Variation
    |   |      | |          |           |     |     |
@@ -809,77 +840,103 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A
 */
     else if (strcmp(szNmeaType, "$GPRMC") == 0)
         {
-char      szTemp1[100];
-char      szTemp2[100];
-char      szTemp3[100];
-char      szTemp4[100];
-char      szTemp5[100];
-char      szTemp6[100];
-char      szTemp7[100];
-char      szTemp8[100];
-char      szTemp9[100];
-char      szTemp10[100];
-char      szTemp11[100];
+//char      szTemp1[100];
+//char      szTemp2[100];
+//char      szTemp3[100];
+//char      szTemp4[100];
+//char      szTemp5[100];
+//char      szTemp6[100];
+//char      szTemp7[100];
+//char      szTemp8[100];
+//char      szTemp9[100];
+//char      szTemp10[100];
+//char      szTemp11[100];
 
 //sscanf(szNmeaMsg, "%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,%s",
 //sscanf(szNmeaMsg, "%[^,]s",
 //sscanf(szNmeaMsg, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
-sscanf(szNmeaMsg, "%[^,]s,%[^,]s,%[^,]s,%[^,]s",
-    szTemp1, szTemp2,  szTemp3,  szTemp4,  szTemp5,  szTemp6,  szTemp7,  szTemp8,  szTemp9,  szTemp10,  szTemp11);
+//sscanf(szNmeaMsg, "%[^,]s,%[^,]s,%[^,]s,%[^,]s",
+//    szTemp1, szTemp2,  szTemp3,  szTemp4,  szTemp5,  szTemp6,  szTemp7,  szTemp8,  szTemp9,  szTemp10,  szTemp11);
 
         // Time
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Status
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Latitude
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Longitude
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Speed
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Track
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Date
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
         // Magnetic Variation
-        szTemp = strtok(NULL,",");
-        if (szTemp != NULL) 
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Mode Indicator
+        szTemp = NmeaStrTok(NULL,"*");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Checksum
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+
+        // Test
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
+            {
+            }
+        szTemp = NmeaStrTok(NULL,",");
+        if (szTemp[0] != '\0') 
             {
             }
 
@@ -897,4 +954,48 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo)
     {
 
     return;
+    }
+
+
+/* ------------------------------------------------------------------------ */
+
+// Tokenize a NMEA string similar to how strtok() works.  The problem with
+// strtok() is that it doesn't handle the case where there is no string
+// between tokens.  NMEA just *loves* to do this.
+char * NmeaStrTok(char * szNmea, char * szDelimiters)
+    {
+    static size_t   iFirstCharIdx = 0;
+    static size_t   iLastCharIdx  = 0;
+    static size_t   iNmeaLen      = 0;
+    static char *   szNmeaLocal   = "\0";
+
+    // Non-null szNmea means this is an initial call
+    if (szNmea != NULL)
+        {
+        szNmeaLocal   = szNmea;
+        iFirstCharIdx = 0;
+        iLastCharIdx  = 0;
+        iNmeaLen      = strlen(szNmea);
+        } // end if first call with input string
+
+    // Null means subsequent call
+    else
+        {
+        // If not at the end of the string, move just beyond the previous token
+        if (iLastCharIdx < iNmeaLen)
+            iFirstCharIdx = iLastCharIdx + 1;
+        else
+            iFirstCharIdx = iLastCharIdx;
+        }
+
+    // Walk the string until a delimiter is found
+    iLastCharIdx  = iFirstCharIdx;
+    while (strchr(szDelimiters, (int)szNmeaLocal[iLastCharIdx]) == NULL)
+        {
+        iLastCharIdx++;
+        }
+
+    szNmeaLocal[iLastCharIdx] = '\0';
+
+    return &szNmeaLocal[iFirstCharIdx];
     }
