@@ -92,6 +92,14 @@ typedef struct
 typedef struct
     {
     int         bValid;
+    float       fLatitude;      // Latitude
+    float       fLongitude;     // Longitude
+    float       fSpeed;         // Speed over the ground, knots
+    float       fTrack;         // Course over the ground, degrees true
+    int         iYear;
+    int         iMonth;
+    int         iDay;
+    float       fMagVar;        // Magnetic variance, + = W, - = E
     } SuNmeaGPRMC;
 
 // Hold all data for a particular time
@@ -99,7 +107,7 @@ typedef struct
     {
     int             iSeconds;       // Seconds since midnight of these messages
     SuNmeaGPGGA     suNmeaGPGGA;
-    SuNmeaGPRMC     suNmeaGPRCM;
+    SuNmeaGPRMC     suNmeaGPRMC;
     } SuNmeaInfo;
 
 /*
@@ -407,6 +415,7 @@ int main(int argc, char ** argv)
                             // If the time changed then output the data
                             iSeconds = iDecodeNmeaTime(pchNmeaBuff);
                             if ((iSeconds != -1) &&
+                                (suNmeaInfo.iSeconds != -1) &&
                                 (iSeconds != suNmeaInfo.iSeconds))
                                 {
                                 DisplayData(&suNmeaInfo);
@@ -431,6 +440,7 @@ int main(int argc, char ** argv)
                             // If the time changed then output the data
                             iSeconds = iDecodeNmeaTime(pchNmeaBuff);
                             if ((iSeconds != -1) &&
+                                (suNmeaInfo.iSeconds != -1) &&
                                 (iSeconds != suNmeaInfo.iSeconds))
                                 {
                                 DisplayData(&suNmeaInfo);
@@ -470,6 +480,7 @@ int main(int argc, char ** argv)
                         // If the time changed then output the data
                         iSeconds = iDecodeNmeaTime(pchNmeaBuff);
                         if ((iSeconds != -1) &&
+                            (suNmeaInfo.iSeconds != -1) &&
                             (iSeconds != suNmeaInfo.iSeconds))
                             {
                             DisplayData(&suNmeaInfo);
@@ -639,7 +650,7 @@ int  iDecodeNmeaTime(const char * szNmea)
     szNmeaType = NmeaStrTok(szLocalNmeaBuff, ",");
 
     // If we got no sentence type then return error
-    if (szNmeaType == NULL)
+    if (szNmeaType[0] == '\0')
         return -1;
 
     // Figure out what kind of sentence and then find the time
@@ -647,7 +658,7 @@ int  iDecodeNmeaTime(const char * szNmea)
         (strcmp(szNmeaType, "$GPRMC") == 0))
         {
         szNmeaTime = NmeaStrTok(NULL,",");
-        if (szNmeaTime == NULL)
+        if (szNmeaTime[0] == '\0')
             return -1;
         else
             {
@@ -889,85 +900,133 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 */
     else if (strcmp(szNmeaType, "$GPRMC") == 0)
         {
+        char    * szTime;
+        char    * szStatus;
+        char    * szLat;
+        char    * szLatNS;
+        char    * szLon;
+        char    * szLonEW;
+        char    * szSpeed;
+        char    * szTrack;
+        char    * szDate;
+        char    * szMagVar;
+        char    * szMagVarEW;
+        char    * szMode;
+        char    * szChecksum;
+
         // Time
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szTime = NmeaStrTok(NULL,",");
+        if (szTime[0] != '\0') 
             {
+            int     iTokens;
+            int     iHour;
+            int     iMin;
+            int     iSec;
+            iTokens = sscanf(szTime, "%2d%2d%2d", &iHour, &iMin, &iSec);
+            if (iTokens != 3)
+                return -1;
+            psuNmeaInfo->iSeconds = iHour*3600 + iMin*60 + iSec;
             }
 
         // Status
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szStatus = NmeaStrTok(NULL,",");
+        if (szStatus[0] != '\0') 
             {
+            if (szStatus[0] == 'A')
+                psuNmeaInfo->suNmeaGPRMC.bValid = bTRUE;
+            else
+                psuNmeaInfo->suNmeaGPRMC.bValid = bFALSE;
             }
+        else
+            psuNmeaInfo->suNmeaGPRMC.bValid = bFALSE;
 
         // Latitude
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLat = NmeaStrTok(NULL,",");
+        if (szLat[0] != '\0') 
             {
+            int     iDegrees;
+            float   fSeconds;
+            int     iTokens;
+            iTokens = sscanf(szLat, "%2d%f", &iDegrees, &fSeconds);
+            if (iTokens == 2)
+                psuNmeaInfo->suNmeaGPRMC.fLatitude = iDegrees + fSeconds/60;
             }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+
+        szLatNS = NmeaStrTok(NULL,",");
+        if (szLatNS[0] != '\0') 
             {
+            if (szLatNS[0] == 'S')
+                psuNmeaInfo->suNmeaGPRMC.fLatitude = -psuNmeaInfo->suNmeaGPRMC.fLatitude;
             }
 
         // Longitude
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLon = NmeaStrTok(NULL,",");
+        if (szLon[0] != '\0') 
             {
+            int     iDegrees;
+            float   fSeconds;
+            int     iTokens;
+            iTokens = sscanf(szLon, "%3d%f", &iDegrees, &fSeconds);
+            if (iTokens == 2)
+                psuNmeaInfo->suNmeaGPRMC.fLongitude = iDegrees + fSeconds/60;
             }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+
+        szLonEW = NmeaStrTok(NULL,",");
+        if (szLonEW[0] != '\0') 
             {
+            if (szLonEW[0] == 'W')
+                psuNmeaInfo->suNmeaGPRMC.fLongitude = -psuNmeaInfo->suNmeaGPRMC.fLongitude;
             }
 
         // Speed
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szSpeed = NmeaStrTok(NULL,",");
+        if (szSpeed[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPRMC.fSpeed = atof(szSpeed);
             }
 
         // Track
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szTrack = NmeaStrTok(NULL,",");
+        if (szTrack[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPRMC.fTrack = atof(szTrack);
             }
 
         // Date
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szDate = NmeaStrTok(NULL,",");
+        if (szDate[0] != '\0') 
             {
+            int     iTokens;
+            iTokens = sscanf(szDate, "%2d%2d%2d", 
+                &psuNmeaInfo->suNmeaGPRMC.iDay, 
+                &psuNmeaInfo->suNmeaGPRMC.iMonth, 
+                &psuNmeaInfo->suNmeaGPRMC.iYear);
+            psuNmeaInfo->suNmeaGPRMC.iYear += 2000;
             }
 
         // Magnetic Variation
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szMagVar = NmeaStrTok(NULL,",");
+        if (szMagVar[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPRMC.fMagVar = atof(szMagVar);
             }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+
+        szMagVarEW = NmeaStrTok(NULL,",");
+        if (szMagVarEW[0] != '\0') 
             {
+            if (szMagVarEW[0] == 'E')
+                psuNmeaInfo->suNmeaGPRMC.fMagVar = -psuNmeaInfo->suNmeaGPRMC.fMagVar;
             }
 
         // Mode Indicator
-        szTemp = NmeaStrTok(NULL,"*");
-        if (szTemp[0] != '\0') 
+        szMode = NmeaStrTok(NULL,"*");
+        if (szMode[0] != '\0') 
             {
             }
 
         // Checksum
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
-            {
-            }
-
-        // Test
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
-            {
-            }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szChecksum = NmeaStrTok(NULL,",");
+        if (szChecksum[0] != '\0') 
             {
             }
 
@@ -983,7 +1042,30 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 
 void DisplayData(SuNmeaInfo * psuNmeaInfo)
     {
-    printf("%d %f %f\n", psuNmeaInfo->iSeconds, psuNmeaInfo->suNmeaGPGGA.fLatitude, psuNmeaInfo->suNmeaGPGGA.fLongitude);
+    int iHour, iMin, iSec;
+
+    // Data, only valid if GPRMC valid
+    if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+        printf("%2.2d/%2.2d/%4.4d ", 
+            psuNmeaInfo->suNmeaGPRMC.iMonth, psuNmeaInfo->suNmeaGPRMC.iDay, psuNmeaInfo->suNmeaGPRMC.iYear);
+    else
+        printf("--/--/---- ");
+
+    // Time, always valid if message is valid
+    iHour = (int) (psuNmeaInfo->iSeconds/3600.0);
+    iMin  = (int)((psuNmeaInfo->iSeconds - iHour*3600)/60.0);
+    iSec  =        psuNmeaInfo->iSeconds - iHour*3600 - iMin*60;
+    printf("%2.2d:%2.2d:%2.2d ", iHour, iMin, iSec);
+
+    // Position
+    if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+        printf("%9.5f %10.5f ", psuNmeaInfo->suNmeaGPGGA.fLatitude, psuNmeaInfo->suNmeaGPGGA.fLongitude);
+    else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+        printf("%9.5f %10.5f ", psuNmeaInfo->suNmeaGPRMC.fLatitude, psuNmeaInfo->suNmeaGPRMC.fLongitude);
+    else
+        printf("---.-----  ---.----- ");
+
+    printf("\n");
 
     return;
     }
