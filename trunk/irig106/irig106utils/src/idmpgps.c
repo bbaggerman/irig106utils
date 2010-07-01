@@ -81,7 +81,7 @@ typedef struct
     int         bValid;
     float       fLatitude;      // Latitude
     float       fLongitude;     // Longitude
-    float       fFixQuality;    // Fix quality
+    int         iFixQuality;    // Fix quality
     int         iNumSats;       // Number of satellites
     float       fHDOP;          // HDOP
     float       fAltitude;      // Altitude MSL (meters)
@@ -671,11 +671,6 @@ int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
     char    szLocalNmeaBuff[1000];
     char  * szNmeaType;
     char  * szTemp;
-    //int     iTokens;
-    //int     iSeconds;
-    //int     iHour;
-    //int     iMin;
-    //int     iSec;
 
     // Make a local copy of the string because strtok() inserts nulls
     strcpy(szLocalNmeaBuff, szNmeaMsg);
@@ -727,90 +722,144 @@ $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,1.0,0000*47
 */
     if (strcmp(szNmeaType, "$GPGGA") == 0)
         {
+        char    * szTime;
+        char    * szLat;
+        char    * szLatNS;
+        char    * szLon;
+        char    * szLonEW;
+        char    * szQuality;
+        char    * szSats;
+        char    * szHDOP;
+        char    * szAlt;
+        char    * szAltM;
+        char    * szHAE;
+        char    * szHAEM;
+        char    * szDiffAge;
+        char    * szStation;
+        char    * szChecksum;
+
         // Time
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szTime = NmeaStrTok(NULL,",");
+        if (szTime[0] != '\0') 
             {
+            int     iTokens;
+            int     iHour;
+            int     iMin;
+            int     iSec;
+            iTokens = sscanf(szTime, "%2d%2d%2d", &iHour, &iMin, &iSec);
+            if (iTokens != 3)
+                return -1;
+            psuNmeaInfo->iSeconds = iHour*3600 + iMin*60 + iSec;
             }
 
         // Latitude
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLat = NmeaStrTok(NULL,",");
+        if (szLat[0] != '\0') 
             {
+            int     iDegrees;
+            float   fSeconds;
+            int     iTokens;
+            iTokens = sscanf(szLat, "%2d%f", &iDegrees, &fSeconds);
+            if (iTokens == 2)
+                psuNmeaInfo->suNmeaGPGGA.fLatitude = iDegrees + fSeconds/60;
             }
 
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLatNS = NmeaStrTok(NULL,",");
+        if (szLatNS[0] != '\0') 
             {
+            if (szLatNS[0] == 'S')
+                psuNmeaInfo->suNmeaGPGGA.fLatitude = -psuNmeaInfo->suNmeaGPGGA.fLatitude;
             }
 
         // Longitude
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLon = NmeaStrTok(NULL,",");
+        if (szLon[0] != '\0') 
             {
+            int     iDegrees;
+            float   fSeconds;
+            int     iTokens;
+            iTokens = sscanf(szLon, "%3d%f", &iDegrees, &fSeconds);
+            if (iTokens == 2)
+                psuNmeaInfo->suNmeaGPGGA.fLongitude = iDegrees + fSeconds/60;
             }
 
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szLonEW = NmeaStrTok(NULL,",");
+        if (szLonEW[0] != '\0') 
             {
+            if (szLonEW[0] == 'W')
+                psuNmeaInfo->suNmeaGPGGA.fLongitude = -psuNmeaInfo->suNmeaGPGGA.fLongitude;
             }
 
         // Fix quality
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szQuality = NmeaStrTok(NULL,",");
+        if (szQuality[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPGGA.iFixQuality = atoi(szQuality);
             }
+        else
+            psuNmeaInfo->suNmeaGPGGA.iFixQuality = 0;;
 
         // Number of satellites
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szSats = NmeaStrTok(NULL,",");
+        if (szSats[0] != '\0')
             {
+            psuNmeaInfo->suNmeaGPGGA.iNumSats = atoi(szSats);
             }
 
         // HDOP
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szHDOP = NmeaStrTok(NULL,",");
+        if (szHDOP[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPGGA.fHDOP = (float)atof(szHDOP);
             }
 
         // Altitude MSL (meters)
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szAlt = NmeaStrTok(NULL,",");
+        if (szAlt[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPGGA.fAltitude = (float)atof(szAlt);
             }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+
+        szAltM = NmeaStrTok(NULL,",");
+        if (szAltM[0] != '\0') 
             {
             }
 
         // Height above WGS84 ellipsoid (meters)
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szHAE = NmeaStrTok(NULL,",");
+        if (szHAE[0] != '\0') 
             {
+            psuNmeaInfo->suNmeaGPGGA.fHAE = (float)atof(szHAE);
             }
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+
+        szHAEM = NmeaStrTok(NULL,",");
+        if (szHAEM[0] != '\0') 
             {
             }
 
         // Age of differential GPS data
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szDiffAge = NmeaStrTok(NULL,",");
+        if (szDiffAge[0] != '\0') 
             {
             }
 
         // Differential reference station
-        szTemp = NmeaStrTok(NULL,"*");
-        if (szTemp[0] != '\0') 
+        szStation = NmeaStrTok(NULL,"*");
+        if (szStation[0] != '\0') 
             {
             }
 
         // Checksum
-        szTemp = NmeaStrTok(NULL,",");
-        if (szTemp[0] != '\0') 
+        szChecksum = NmeaStrTok(NULL,",");
+        if (szChecksum[0] != '\0') 
             {
             }
 
+        // Set validity flag
+        if ((szLat[0] != '\0') && (szLon[0] != '\0') && (psuNmeaInfo->suNmeaGPGGA.iFixQuality != 0))
+            psuNmeaInfo->suNmeaGPGGA.bValid = bTRUE;
+        else
+            psuNmeaInfo->suNmeaGPGGA.bValid = bFALSE;
         } // end if GPGGA
 
 /*
@@ -840,24 +889,6 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 */
     else if (strcmp(szNmeaType, "$GPRMC") == 0)
         {
-//char      szTemp1[100];
-//char      szTemp2[100];
-//char      szTemp3[100];
-//char      szTemp4[100];
-//char      szTemp5[100];
-//char      szTemp6[100];
-//char      szTemp7[100];
-//char      szTemp8[100];
-//char      szTemp9[100];
-//char      szTemp10[100];
-//char      szTemp11[100];
-
-//sscanf(szNmeaMsg, "%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,]s%[^,%s",
-//sscanf(szNmeaMsg, "%[^,]s",
-//sscanf(szNmeaMsg, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
-//sscanf(szNmeaMsg, "%[^,]s,%[^,]s,%[^,]s,%[^,]s",
-//    szTemp1, szTemp2,  szTemp3,  szTemp4,  szTemp5,  szTemp6,  szTemp7,  szTemp8,  szTemp9,  szTemp10,  szTemp11);
-
         // Time
         szTemp = NmeaStrTok(NULL,",");
         if (szTemp[0] != '\0') 
@@ -952,6 +983,7 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 
 void DisplayData(SuNmeaInfo * psuNmeaInfo)
     {
+    printf("%d %f %f\n", psuNmeaInfo->iSeconds, psuNmeaInfo->suNmeaGPGGA.fLatitude, psuNmeaInfo->suNmeaGPGGA.fLongitude);
 
     return;
     }
