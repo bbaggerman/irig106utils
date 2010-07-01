@@ -681,7 +681,7 @@ int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo)
     {
     char    szLocalNmeaBuff[1000];
     char  * szNmeaType;
-    char  * szTemp;
+//    char  * szTemp;
 
     // Make a local copy of the string because strtok() inserts nulls
     strcpy(szLocalNmeaBuff, szNmeaMsg);
@@ -982,14 +982,14 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
         szSpeed = NmeaStrTok(NULL,",");
         if (szSpeed[0] != '\0') 
             {
-            psuNmeaInfo->suNmeaGPRMC.fSpeed = atof(szSpeed);
+            psuNmeaInfo->suNmeaGPRMC.fSpeed = (float)atof(szSpeed);
             }
 
         // Track
         szTrack = NmeaStrTok(NULL,",");
         if (szTrack[0] != '\0') 
             {
-            psuNmeaInfo->suNmeaGPRMC.fTrack = atof(szTrack);
+            psuNmeaInfo->suNmeaGPRMC.fTrack = (float)atof(szTrack);
             }
 
         // Date
@@ -1008,7 +1008,7 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
         szMagVar = NmeaStrTok(NULL,",");
         if (szMagVar[0] != '\0') 
             {
-            psuNmeaInfo->suNmeaGPRMC.fMagVar = atof(szMagVar);
+            psuNmeaInfo->suNmeaGPRMC.fMagVar = (float)atof(szMagVar);
             }
 
         szMagVarEW = NmeaStrTok(NULL,",");
@@ -1104,7 +1104,8 @@ char * NmeaStrTok(char * szNmea, char * szDelimiters)
 
     // Walk the string until a delimiter is found
     iLastCharIdx  = iFirstCharIdx;
-    while (strchr(szDelimiters, (int)szNmeaLocal[iLastCharIdx]) == NULL)
+    while ((strchr(szDelimiters, (int)szNmeaLocal[iLastCharIdx]) == NULL) &&
+           (szNmeaLocal[iLastCharIdx]                            != '\0'))
         {
         iLastCharIdx++;
         }
