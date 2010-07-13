@@ -142,8 +142,9 @@ typedef struct {
     } SuPos;
 
 typedef struct {
-    int           bValid;
-    int           bHaveAttitude;
+    int           bValidPos;
+    int           bValidAlt;
+    int           bValidHeading;
     SuPos         suPos;
     float         fSpeed;            // Ground speed
     } SuAC_Data;
@@ -195,7 +196,7 @@ char * NmeaStrTok(char * szNmea, char * szTokens);
 void CalculexGpsFix(char * achNmeaBuff, int iBuffLen);
 
 // Target relative calculations
-void CalcTargetData(SuNmeaInfo * suNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange);
+void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange);
 void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel);
 void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle);
 void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
@@ -1406,8 +1407,14 @@ void CalculexGpsFix(char * achNmeaBuff, int iBuffLen)
 // from the idumpins program, this routine sort of acts as a shim between what is
 // limited GPS data (position + ground track masquerading as heading, maybe) and
 // full 6DOF provided by a true INS.
-void CalcTargetData(SuNmeaInfo * suNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange)
+void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange)
     {
+    SuAC_Data   suGPS;
+
+//    SuAC_Data;
+
+//    SuRelPos;
+
     SuTargPosLL   * psuCurrTarg;
 
     // If dump radius not used then we are always in range
@@ -1416,41 +1423,60 @@ void CalcTargetData(SuNmeaInfo * suNmeaInfo, SuTargPosLL * psuFirstTarg, float f
     else
         *pbInRange = bFALSE;
 
+    // Put GPS position into the AC position structure
+    if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+        {
+        suGPS.suPos.dLon = psuNmeaInfo->suNmeaGPGGA.fLongitude;
+        suGPS.suPos.dLat = psuNmeaInfo->suNmeaGPGGA.fLatitude;
+        suGPS.bValidPos  = bTRUE;
+        }
+    else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+        {
+        suGPS.suPos.dLon = psuNmeaInfo->suNmeaGPRMC.fLongitude;
+        suGPS.suPos.dLat = psuNmeaInfo->suNmeaGPRMC.fLatitude;
+        suGPS.bValidPos  = bTRUE;
+        }
+    else
+        {
+        suGPS.bValidPos  = bFALSE;
+        return;
+        }
+
+    // Altitude
+    if (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+        {
+        suGPS.suPos.fAltitude = (float)METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fAltitude);
+        suGPS.bValidAlt       = bTRUE;
+        }
+    else
+        {
+        suGPS.suPos.fAltitude = 0.0;
+        suGPS.bValidAlt       = bFALSE;
+        }
+
+    // Track over the ground is approximately heading
+    if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+        {
+        suGPS.suPos.fHeading = psuNmeaInfo->suNmeaGPRMC.fTrack;
+        suGPS.bValidHeading  = bTRUE;
+        }
+    else
+        {
+        suGPS.suPos.fHeading = 0.0;
+        suGPS.bValidHeading  = bFALSE;
+        }
+
+    // Roll and pitch assume straight and level
+    suGPS.suPos.fPitch = 0.0;
+    suGPS.suPos.fRoll  = 0.0;
+
     // Step through all the targets
     psuCurrTarg = psuFirstTarg;
     while (psuCurrTarg != NULL) 
         {
-#if 0
-        // Put GPS position into the AC position structure
-        if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
-            {
-            psuNmeaInfo->suNmeaGPGGA.fLongitude
-            psuNmeaInfo->suNmeaGPGGA.fLatitude
-            }
-        else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
-            {
-            psuNmeaInfo->suNmeaGPRMC.fLongitude
-            psuNmeaInfo->suNmeaGPRMC.fLatitude
-            }
-        else
-            {
-            }
-
-        // Altitude
-        if (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
-            METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fAltitude)
-        else
-
-        // Course over the ground and speed
-        if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
-            psuNmeaInfo->suNmeaGPRMC.fTrack
-        else
-
         // Calculate relative position
-        vCalcRel(&suAC.suPos,            &(psuCurrTarg->suPos),  &(psuCurrTarg->suAC2Target));
-        vCalcRel(&(psuCurrTarg->suPos),  &suAC.suPos,            &(psuCurrTarg->suTarget2AC));
-
-#endif
+        vCalcRel(&suGPS.suPos,           &(psuCurrTarg->suPos),  &(psuCurrTarg->suAC2Target));
+        vCalcRel(&(psuCurrTarg->suPos),  &suGPS.suPos,           &(psuCurrTarg->suTarget2AC));
 
         // See if in range of target
         if (*pbInRange == bFALSE)
