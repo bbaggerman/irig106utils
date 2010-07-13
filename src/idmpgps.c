@@ -38,6 +38,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
@@ -69,6 +70,19 @@
 #define CR      (13)
 #define LF      (10)
 
+#if !defined(__GNUC__)
+#define M_PI        3.14159265358979323846
+#define M_PI_2      1.57079632679489661923
+#define M_PI_4      0.785398163397448309616
+#endif
+
+#define DEG_TO_RAD(angle)     ((angle)*M_PI/180.0)
+#define RAD_TO_DEG(angle)     ((angle)*180.0/M_PI)
+#define FT_TO_METERS(ft)      ((ft)/0.3048)
+#define METERS_TO_FT(meters)  ((meters)*0.3048)
+#define SQUARED(value)        ((value)*(value))
+#define CUBED(value)          ((value)*(value)*(value))
+
 
 /*
  * Data structures
@@ -79,8 +93,8 @@
 typedef struct
     {
     int         bValid;
-    float       fLatitude;      // Latitude
-    float       fLongitude;     // Longitude
+    double      fLatitude;      // Latitude
+    double      fLongitude;     // Longitude
     int         iFixQuality;    // Fix quality
     int         iNumSats;       // Number of satellites
     float       fHDOP;          // HDOP
@@ -92,8 +106,8 @@ typedef struct
 typedef struct
     {
     int         bValid;
-    float       fLatitude;      // Latitude
-    float       fLongitude;     // Longitude
+    double      fLatitude;      // Latitude
+    double      fLongitude;     // Longitude
     float       fSpeed;         // Speed over the ground, knots
     float       fTrack;         // Course over the ground, degrees true
     int         iYear;
@@ -110,29 +124,82 @@ typedef struct
     SuNmeaGPRMC     suNmeaGPRMC;
     } SuNmeaInfo;
 
+
+// This is a lot of stuff I lifted from dumpins while riding through the Utah desert
+// in the back seat.  BTW, southern Utah is *way* cool.  I highly recommend spending
+// a few days in Moab, UT to enjoy Canyonlands and Dead Horse Point.  The Grand Canyon
+// is grand but I like Canyonlands better.  OK, back to the code comments. These 
+// structures support calculating distance and angles to and from a target location 
+// on the ground.
+
+typedef struct {
+    double        dLat;
+    double        dLon;
+    float         fAltitude;         // GPS altitude MSL feet
+    float         fRoll;             // Aircraft roll position
+    float         fPitch;            // Aircraft pitch position
+    float         fHeading;          // True heading
+    } SuPos;
+
+typedef struct {
+    int           bValid;
+    int           bHaveAttitude;
+    SuPos         suPos;
+    float         fSpeed;            // Ground speed
+    } SuAC_Data;
+
+typedef struct {
+    float         fAz;               // Azimuth, 0 = North
+    float         fEl;               // Elevation angle, + UP, - Down
+    float         fRange;            // Range in nautical miles
+    } SuRelPos;
+
+typedef struct TargPosLL_S {
+    SuPos                suPos;
+    SuRelPos             suAC2Target;
+    SuRelPos             suTarget2AC;
+    struct TargPosLL_S * psuNext;
+    } SuTargPosLL;
+
 /*
  * Module data
  * -----------
  */
 
-int           m_iVersion;    // Data file version
-int           m_usMaxBuffSize;
+int             m_iVersion;    // Data file version
+int             m_usMaxBuffSize;
 
-int           m_iI106Handle;
+int             m_iI106Handle;
 
+int             m_bDumpGGA;
+int             m_bDumpRMC;
+
+SuTargPosLL   * m_psuFirstTarg = NULL;
 
 /*
  * Function prototypes
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 
 void ClearNmeaInfo(SuNmeaInfo * psuNmeaInfo);
+void DisplayTitles(FILE * psuOutFile);
+void DisplayData(SuNmeaInfo * psuNmeaInfo, FILE * psuOutFile);
+
+// NMEA string routines
 int  iDecodeNmeaTime(const char * szNmea);
 int  bDecodeNmea(const char * szNmeaMsg, SuNmeaInfo * psuNmeaInfo);
-void DisplayData(SuNmeaInfo * psuNmeaInfo);
 char * NmeaStrTok(char * szNmea, char * szTokens);
+
+void CalculexGpsFix(char * achNmeaBuff, int iBuffLen);
+
+// Target relative calculations
+void CalcTargetData(SuNmeaInfo * suNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange);
+void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel);
+void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle);
+void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
+                      double *pdAz, double *pdEl, double *pdDist);
 
 void vUsage(void);
 
@@ -145,7 +212,7 @@ int main(int argc, char ** argv)
     char                    szInFile[256];      // Input file name
     char                    szOutFile[256];     // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;          // Output file handle
+    FILE                  * psuOutFile;         // Output file handle
 
     int                     iChannel;           // Channel number
     unsigned long           lMsgs = 0L;         // Total message
@@ -165,13 +232,23 @@ int main(int argc, char ** argv)
     SuUartF0_CurrMsg        suUartMsg;
     SuTmatsInfo             suTmatsInfo;
 
+    enum EnReadState { WaitForStart, CopyMsgChar, CopyChecksum } enReadState = WaitForStart;
+
     char                  * pchNmeaBuff;
     int                     iNmeaBuffLen = 1000;
     int                     iNmeaBuffIdx = 0;
+    int                     iChecksumIdx = 0;
     SuNmeaInfo              suNmeaInfo;
     int                     bDecodeStatus;
 
     int                     iSeconds;
+
+    // Ground target info
+    float               fDumpRadius = 0;
+    SuTargPosLL      ** ppsuCurrTarg = &m_psuFirstTarg;
+    SuTargPosLL       * psuCurrTarg;
+    int                 bInRange = bTRUE;
+
 /*
  * Process the command line arguements
  */
@@ -187,6 +264,9 @@ int main(int argc, char ** argv)
     bVerbose        = bFALSE;            // No verbosity
     bString         = bFALSE;
     bPrintTMATS     = bFALSE;
+
+    m_bDumpGGA       = bFALSE;
+    m_bDumpRMC       = bFALSE;
 
     szInFile[0]  = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
@@ -210,6 +290,34 @@ int main(int argc, char ** argv)
 
                     case 's' :                   // Verbose switch
                         bString = bTRUE;
+                        break;
+
+                    case 'G' :                   // Dump GGA data
+                        m_bDumpGGA = bTRUE;
+                        break;
+
+                    case 'C' :                   // Dump RMC data
+                        m_bDumpRMC = bTRUE;
+                        break;
+
+                    case 'g' :                   /* Ground target position */
+                        *ppsuCurrTarg = malloc(sizeof(SuTargPosLL));
+                        (*ppsuCurrTarg)->psuNext = NULL;
+                        iArgIdx++;
+                        sscanf(argv[iArgIdx],"%lf",&((*ppsuCurrTarg)->suPos.dLat));
+                        iArgIdx++;
+                        sscanf(argv[iArgIdx],"%lf",&((*ppsuCurrTarg)->suPos.dLon));
+                        iArgIdx++;
+                        sscanf(argv[iArgIdx],"%f", &((*ppsuCurrTarg)->suPos.fAltitude));
+                        (*ppsuCurrTarg)->suPos.fRoll    = 0.0f;
+                        (*ppsuCurrTarg)->suPos.fPitch   = 0.0f;
+                        (*ppsuCurrTarg)->suPos.fHeading = 0.0f;
+                        ppsuCurrTarg = &((*ppsuCurrTarg)->psuNext);
+                        break;
+
+                    case 'm' :                   /* Dump radius */
+                        iArgIdx++;
+                        sscanf(argv[iArgIdx],"%f",&fDumpRadius);
                         break;
 
                     case 'T' :                   // Print TMATS flag
@@ -243,6 +351,14 @@ int main(int argc, char ** argv)
         return 1;
         }
 
+    // If not message data was specified then dump it all
+    if ((m_bDumpGGA == bFALSE) &&
+        (m_bDumpRMC == bFALSE))
+        {
+        m_bDumpGGA = bTRUE;
+        m_bDumpRMC = bTRUE;
+        }
+
 /*
  * Opening banner
  * --------------
@@ -270,12 +386,12 @@ int main(int argc, char ** argv)
             break;
         }
 
-    enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
-    if (enStatus != I106_OK)
-        {
-        fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
-        return 1;
-        }
+    //enStatus = enI106_SyncTime(m_iI106Handle, bFALSE, 0);
+    //if (enStatus != I106_OK)
+    //    {
+    //    fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
+    //    return 1;
+    //    }
 
 
 /*
@@ -285,8 +401,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -296,9 +412,8 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
-
 
 /*
  * Read the first header. If TMATS flag set, print TMATS and exit
@@ -331,7 +446,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -343,6 +458,37 @@ int main(int argc, char ** argv)
 
         return 0;
         } // end if print TMATS
+
+/*
+ * Everything OK so print some info
+ */
+
+    fprintf(stderr, "Input Data file '%s'\n", szInFile);
+    if (psuOutFile != stderr)
+        fprintf(psuOutFile,"Input Data file '%s'\n", szInFile);
+
+    if (m_psuFirstTarg != NULL) 
+        {
+        psuCurrTarg = m_psuFirstTarg;
+        while (psuCurrTarg != NULL) 
+            {
+            fprintf(psuOutFile,"Ground Target   Lat %12.6f  Lon %12.6f  Elev %5.0f\n",
+                psuCurrTarg->suPos.dLat,
+                psuCurrTarg->suPos.dLon, 
+                psuCurrTarg->suPos.fAltitude);
+            psuCurrTarg = psuCurrTarg->psuNext;
+            } // end while relative targets to calculate for
+        }
+
+    if (fDumpRadius != 0.0) 
+        {
+        fprintf(psuOutFile,"Dump Radius %6.1f nm\n", fDumpRadius);
+        }
+
+    fprintf(psuOutFile,"\n\n");
+
+    // Print column titles. Harder than it sounds.
+    DisplayTitles(psuOutFile);
 
 /*
  * Read messages until error or EOF
@@ -400,103 +546,76 @@ int main(int argc, char ** argv)
                     {
 
 //                    enI106_RelInt2IrigTime(m_iI106Handle, suUartMsg.suTimeRef.uRelTime, &suUartMsg.suTimeRef.suIrigTime);
-//                    fprintf(ptOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
+//                    fprintf(psuOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
 
                     // Copy UART data to holding buffer
                     for (iWordIdx=0; iWordIdx<suUartMsg.psuUartHdr->uDataLength; iWordIdx++) 
                         {
-                        // If end of line then check buffer for message
-                        if ((suUartMsg.pauData[iWordIdx] == CR) ||
-                            (suUartMsg.pauData[iWordIdx] == LF))
+                        switch (enReadState)
                             {
-                            // Null terminate the string
-                            pchNmeaBuff[iNmeaBuffIdx] = '\0';
+                            // Waiting for the first "$" character of a new message
+                            case WaitForStart :
+                            default :
+                                // If beginning of new message then check buffer for message
+                                if (suUartMsg.pauData[iWordIdx] == '$')
+                                    {
+                                    pchNmeaBuff[0] = suUartMsg.pauData[iWordIdx];
+                                    iNmeaBuffIdx = 1;
+                                    enReadState = CopyMsgChar;
+                                    }
+                                break;
 
-                            // If the time changed then output the data
-                            iSeconds = iDecodeNmeaTime(pchNmeaBuff);
-                            if ((iSeconds != -1) &&
-                                (suNmeaInfo.iSeconds != -1) &&
-                                (iSeconds != suNmeaInfo.iSeconds))
-                                {
-                                DisplayData(&suNmeaInfo);
-                                ClearNmeaInfo(&suNmeaInfo);
-                                }
-
-                            // Decode it if there is anything there
-                            if (iNmeaBuffIdx != 0)
-                                bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
-
-                            // Get setup for a new message
-                            pchNmeaBuff[0] = '\0';
-                            iNmeaBuffIdx = 0;
-                            } // end if CR or LF was found
-
-                        // If beginning of new message then check buffer for message
-                        else if (suUartMsg.pauData[iWordIdx] == '$')
-                            {
-                            // Null terminate the string
-                            pchNmeaBuff[iNmeaBuffIdx] = '\0';
-
-                            // If the time changed then output the data
-                            iSeconds = iDecodeNmeaTime(pchNmeaBuff);
-                            if ((iSeconds != -1) &&
-                                (suNmeaInfo.iSeconds != -1) &&
-                                (iSeconds != suNmeaInfo.iSeconds))
-                                {
-                                DisplayData(&suNmeaInfo);
-                                ClearNmeaInfo(&suNmeaInfo);
-                                }
-
-                            // Decode it if there is anything there
-                            if (iNmeaBuffIdx != 0)
-                                bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
-
-                            // Store the beginning of the new message
-                            pchNmeaBuff[0] = suUartMsg.pauData[iWordIdx];
-                            iNmeaBuffIdx = 1;
-
-                            } // end if new message found
-
-                        // Else just copy the character to the buffer, but only if we've
-                        // already found the beginning of a message
-                        else
-                            {
-                            if (pchNmeaBuff[0] == '$')
-                                {
+                            // Copy character to holding buffer, waiting for terminating "*" character
+                            case CopyMsgChar :
                                 pchNmeaBuff[iNmeaBuffIdx] = suUartMsg.pauData[iWordIdx];
                                 iNmeaBuffIdx++;
-                                }
-                            } // else just copy character to buffer
+                                if (suUartMsg.pauData[iWordIdx] == '*')
+                                    {
+                                    enReadState  = CopyChecksum;
+                                    iChecksumIdx = 0;
+                                    }
+                                break;
 
+                            // Found terminating character, now copying checksum characters
+                            case CopyChecksum :
+                                pchNmeaBuff[iNmeaBuffIdx] = suUartMsg.pauData[iWordIdx];
+                                iNmeaBuffIdx++;
+                                iChecksumIdx++;
+
+                                // If we've got the checksum then decode the message
+                                if (iChecksumIdx > 1)
+                                    {
+                                    // Null terminate the string
+                                    pchNmeaBuff[iNmeaBuffIdx] = '\0';
+
+                                    // Calculex fix
+                                    CalculexGpsFix(pchNmeaBuff, iNmeaBuffIdx);
+
+                                    // If the time changed then output the data
+                                    iSeconds = iDecodeNmeaTime(pchNmeaBuff);
+                                    if ((iSeconds != -1) &&
+                                        (suNmeaInfo.iSeconds != -1) &&
+                                        (iSeconds != suNmeaInfo.iSeconds))
+                                        {
+                                        // If we've got targets then do some calculations
+                                        if (m_psuFirstTarg != NULL)
+                                            CalcTargetData(&suNmeaInfo, m_psuFirstTarg, fDumpRadius, &bInRange);
+                                        DisplayData(&suNmeaInfo, psuOutFile);
+                                        ClearNmeaInfo(&suNmeaInfo);
+                                        }
+
+                                    // Decode the NMEA message
+                                    bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
+
+                                    // Get setup for a new NMEA message
+                                    pchNmeaBuff[0] = '\0';
+                                    iNmeaBuffIdx = 0;
+                                    enReadState = WaitForStart;
+                                } // end if copy checksum done
+                                break;
+
+                            } // end switch on read state
                         } // end for all char in UART message
-
-                    // Some broken recorder implementation strip the CR/LF so need to check
-                    // at the end of the UART message
-                    if (iNmeaBuffIdx != 0)
-                        {
-                        // Null terminate the string
-                        pchNmeaBuff[iNmeaBuffIdx] = '\0';
-
-                        // If the time changed then output the data
-                        iSeconds = iDecodeNmeaTime(pchNmeaBuff);
-                        if ((iSeconds != -1) &&
-                            (suNmeaInfo.iSeconds != -1) &&
-                            (iSeconds != suNmeaInfo.iSeconds))
-                            {
-                            DisplayData(&suNmeaInfo);
-                            ClearNmeaInfo(&suNmeaInfo);
-                            }
-
-                        // Try to decode
-                        bDecodeStatus = bDecodeNmea(pchNmeaBuff, &suNmeaInfo);
-
-                        // If something decoded then reset NMEA buffer
-                        if (bDecodeStatus == bTRUE)
-                            {
-                            pchNmeaBuff[0] = '\0';
-                            iNmeaBuffIdx = 0;
-                            }
-                        } // end if buffer not empty
 
                     lGpsPoints++;
                     if (bVerbose) printf("%8.8ld GPS Points \r",lGpsPoints);
@@ -529,7 +648,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -538,7 +657,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -549,13 +668,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= UART Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= UART Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -578,9 +697,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"UARTIN") == 0)
                     {
-                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
@@ -607,6 +726,8 @@ void vUsage(void)
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");
     printf("   -c ChNum   Channel Number (default all)   \n");
+    printf("   -G         Print NMEA GGA data            \n");
+    printf("   -C         Print NMEA RMC data            \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
     printf("The output data fields are:                  \n");
@@ -768,11 +889,11 @@ $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,1.0,0000*47
         if (szLat[0] != '\0') 
             {
             int     iDegrees;
-            float   fSeconds;
+            double  fSeconds;
             int     iTokens;
-            iTokens = sscanf(szLat, "%2d%f", &iDegrees, &fSeconds);
+            iTokens = sscanf(szLat, "%2d%lf", &iDegrees, &fSeconds);
             if (iTokens == 2)
-                psuNmeaInfo->suNmeaGPGGA.fLatitude = iDegrees + fSeconds/60;
+                psuNmeaInfo->suNmeaGPGGA.fLatitude = iDegrees + fSeconds/60.0;
             }
 
         szLatNS = NmeaStrTok(NULL,",");
@@ -787,11 +908,11 @@ $GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,1.0,0000*47
         if (szLon[0] != '\0') 
             {
             int     iDegrees;
-            float   fSeconds;
+            double  fSeconds;
             int     iTokens;
-            iTokens = sscanf(szLon, "%3d%f", &iDegrees, &fSeconds);
+            iTokens = sscanf(szLon, "%3d%lf", &iDegrees, &fSeconds);
             if (iTokens == 2)
-                psuNmeaInfo->suNmeaGPGGA.fLongitude = iDegrees + fSeconds/60;
+                psuNmeaInfo->suNmeaGPGGA.fLongitude = iDegrees + fSeconds/60.0;
             }
 
         szLonEW = NmeaStrTok(NULL,",");
@@ -1037,35 +1158,160 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 
 
 
+/* ------------------------------------------------------------------------ */
+
+// Print out data column headers
+void DisplayTitles(FILE * psuOutFile)
+    {
+    int             iIdx;
+    int             iDumpRelIdx;
+    SuTargPosLL   * psuCurrTarg;
+
+    /* This queer little piece of code is strictly for the convenience of the
+     * programmer.  You see, there are multiple lines of header information to
+     * write out to the output file but depending upon the command line flags
+     * not all columns of data may be needed.  This weird structure allows me
+     * to keep data column headers together to make it easier to keep things
+     * lined up and looking pretty.  I just wanted to let you know that, no,
+     * I haven't lost my ever lovin' mind.
+     */
+
+    for (iIdx=1; iIdx<=4; iIdx++) 
+        {
+
+        if (m_bDumpRMC)
+            {
+            if (iIdx==1)    fprintf(psuOutFile,"           ");
+            if (iIdx==2)    fprintf(psuOutFile,"           ");
+            if (iIdx==3)    fprintf(psuOutFile,"   Date    ");
+            if (iIdx==4)    fprintf(psuOutFile,"           ");
+            }
+
+        if (m_bDumpRMC || m_bDumpGGA)
+            {
+            if (iIdx==1)    fprintf(psuOutFile,"         ");
+            if (iIdx==2)    fprintf(psuOutFile,"         ");
+            if (iIdx==3)    fprintf(psuOutFile,"  Time   ");
+            if (iIdx==4)    fprintf(psuOutFile,"  (UTC)  ");
+            }
+
+        if (m_bDumpRMC || m_bDumpGGA)
+            {
+            if (iIdx==1)    fprintf(psuOutFile,"     GPS        GPS    ");
+            if (iIdx==2)    fprintf(psuOutFile,"  Longitude  Latitude  ");
+            if (iIdx==3)    fprintf(psuOutFile,"  (+ East)   (+ North) ");
+            if (iIdx==4)    fprintf(psuOutFile,"  (- West)   (- South) ");
+            }
+
+        if (m_bDumpGGA)
+        {
+            if (iIdx==1)    fprintf(psuOutFile,"                ");
+            if (iIdx==2)    fprintf(psuOutFile,"    Altitude    ");
+            if (iIdx==3)    fprintf(psuOutFile,"   MSL     HAE  ");
+            if (iIdx==4)    fprintf(psuOutFile," (feet)  (feet) ");
+        }
+
+        if (m_bDumpRMC)
+            {
+            if (iIdx==1)    fprintf(psuOutFile,"                  ");
+            if (iIdx==2)    fprintf(psuOutFile,"   True    Ground ");
+            if (iIdx==3)    fprintf(psuOutFile,"  Course   Speed  ");
+            if (iIdx==4)    fprintf(psuOutFile,"           (kts)  ");
+            }
+
+        psuCurrTarg  = m_psuFirstTarg;
+        iDumpRelIdx = 1;
+        while (psuCurrTarg != NULL) 
+            {
+            // If we get course over the ground then print out relative bearing
+            if (m_bDumpRMC)
+                {
+                if (iIdx==1)                  fprintf(psuOutFile," ------ Ground Target %d -------", iDumpRelIdx);
+                if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to  Bearing");
+                if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
+                if (iIdx==4)                  fprintf(psuOutFile,"         (true)           (true)");
+//                                                               " ----.-  ---.-   ---.-    ---.- "
+                }
+            else
+                {
+                if (iIdx==1)                  fprintf(psuOutFile," -- Ground Target %d --", iDumpRelIdx);
+                if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to");
+                if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C  ");
+                if (iIdx==4)                  fprintf(psuOutFile,"         (true)        ");
+//                                                               " ----.-  ---.-   ---.- "
+                }
+
+            psuCurrTarg = psuCurrTarg->psuNext;
+            iDumpRelIdx++;
+            }
+
+        fprintf(psuOutFile,"\n");
+
+        } // end for each header line
+
+    return;
+    }
+
+
 
 /* ------------------------------------------------------------------------ */
 
-void DisplayData(SuNmeaInfo * psuNmeaInfo)
+void DisplayData(SuNmeaInfo * psuNmeaInfo, FILE * psuOutFile)
     {
-    int iHour, iMin, iSec;
 
-    // Data, only valid if GPRMC valid
-    if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
-        printf("%2.2d/%2.2d/%4.4d ", 
-            psuNmeaInfo->suNmeaGPRMC.iMonth, psuNmeaInfo->suNmeaGPRMC.iDay, psuNmeaInfo->suNmeaGPRMC.iYear);
-    else
-        printf("--/--/---- ");
+    // Date, only valid if GPRMC valid
+    if (m_bDumpRMC)
+        {
+        if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+            fprintf(psuOutFile,"%2.2d/%2.2d/%4.4d ", 
+                psuNmeaInfo->suNmeaGPRMC.iMonth, psuNmeaInfo->suNmeaGPRMC.iDay, psuNmeaInfo->suNmeaGPRMC.iYear);
+        else
+            fprintf(psuOutFile,"--/--/---- ");
+        }
 
     // Time, always valid if message is valid
-    iHour = (int) (psuNmeaInfo->iSeconds/3600.0);
-    iMin  = (int)((psuNmeaInfo->iSeconds - iHour*3600)/60.0);
-    iSec  =        psuNmeaInfo->iSeconds - iHour*3600 - iMin*60;
-    printf("%2.2d:%2.2d:%2.2d ", iHour, iMin, iSec);
+    if (m_bDumpRMC || m_bDumpGGA)
+        {
+        int iHour, iMin, iSec;
+        iHour = (int) (psuNmeaInfo->iSeconds/3600.0);
+        iMin  = (int)((psuNmeaInfo->iSeconds - iHour*3600)/60.0);
+        iSec  =        psuNmeaInfo->iSeconds - iHour*3600 - iMin*60;
+        fprintf(psuOutFile,"%2.2d:%2.2d:%2.2d ", iHour, iMin, iSec);
+        }
 
     // Position
-    if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
-        printf("%9.5f %10.5f ", psuNmeaInfo->suNmeaGPGGA.fLatitude, psuNmeaInfo->suNmeaGPGGA.fLongitude);
-    else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
-        printf("%9.5f %10.5f ", psuNmeaInfo->suNmeaGPRMC.fLatitude, psuNmeaInfo->suNmeaGPRMC.fLongitude);
-    else
-        printf("---.-----  ---.----- ");
+    if (m_bDumpRMC || m_bDumpGGA)
+        {
+        if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+            fprintf(psuOutFile," %10.5f  %9.5f ", psuNmeaInfo->suNmeaGPGGA.fLongitude, psuNmeaInfo->suNmeaGPGGA.fLatitude);
+        else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+            fprintf(psuOutFile," %10.5f  %9.5f ", psuNmeaInfo->suNmeaGPRMC.fLongitude, psuNmeaInfo->suNmeaGPRMC.fLatitude);
+        else
+            fprintf(psuOutFile," ----.-----  ---.----- ");
+        }
 
-    printf("\n");
+    // Altitude
+    if (m_bDumpGGA)
+        {
+        if (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+            fprintf(psuOutFile," %6.0f  %6.0f ", 
+                METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fAltitude), 
+                METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fHAE));
+        else
+            fprintf(psuOutFile," ------  ------ ");
+        }
+
+    // Course over the ground and speed
+    if (m_bDumpRMC)
+        {
+        if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+            fprintf(psuOutFile,"  %5.1f    %6.1f ", 
+                psuNmeaInfo->suNmeaGPRMC.fTrack, psuNmeaInfo->suNmeaGPRMC.fSpeed);
+        else
+            fprintf(psuOutFile,"  -----    ------ ");
+        }
+
+    fprintf(psuOutFile,"\n");
 
     return;
     }
@@ -1114,3 +1360,177 @@ char * NmeaStrTok(char * szNmea, char * szDelimiters)
 
     return &szNmeaLocal[iFirstCharIdx];
     }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+// The Calculex MONSSTR record incorrectly records the GPRMC GPS message. It
+// looks like they tokenize the string (probably to extract date and time), 
+// and in the proces replace the field seperator character "," with NULL 
+// characters.  The fix is to go back and replace any NULLs with commas again.
+// Word is that this is fixed in a future software release.
+void CalculexGpsFix(char * achNmeaBuff, int iBuffLen)
+    {
+    int iStrIdx;
+    for (iStrIdx=0; iStrIdx<iBuffLen; iStrIdx++)
+        {
+        if (achNmeaBuff[iStrIdx] == '\0')
+            achNmeaBuff[iStrIdx] = ',';
+        }
+    return;
+    }
+
+
+/* ------------------------------------------------------------------------ */
+
+/* 
+ Calculate relative bearing and depression angle to a target point in
+ space (the "psuTo" point) based on aircraft attitude and location (the
+ psuFrom point).
+
+ Relative bearing is the angle between the A/C longitudinal axis (the
+ nose of the A/C) and the project of the vector to the target point
+ onto the lateral plane of the A/C (that is, the plane defined by the
+ A/C longitudinal and lateral axes).
+
+ Relative depression angle is that angle formed between the vector to the
+ target point and this vector's projection onto the A/C lateral plane.
+
+ The relative coordinate system has the psuFrom point at the origin.  The X
+ axis is east, the Y axis north, and the Z axis is up.
+
+ */
+
+// Calculate the relative position from the target.  Since this code was lifted
+// from the idumpins program, this routine sort of acts as a shim between what is
+// limited GPS data (position + ground track masquerading as heading, maybe) and
+// full 6DOF provided by a true INS.
+void CalcTargetData(SuNmeaInfo * suNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange)
+    {
+    SuTargPosLL   * psuCurrTarg;
+
+    // If dump radius not used then we are always in range
+    if (fDumpRadius == 0.0)
+        *pbInRange = bTRUE;
+    else
+        *pbInRange = bFALSE;
+
+    // Step through all the targets
+    psuCurrTarg = psuFirstTarg;
+    while (psuCurrTarg != NULL) 
+        {
+#if 0
+        // Put GPS position into the AC position structure
+        if      (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+            {
+            psuNmeaInfo->suNmeaGPGGA.fLongitude
+            psuNmeaInfo->suNmeaGPGGA.fLatitude
+            }
+        else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+            {
+            psuNmeaInfo->suNmeaGPRMC.fLongitude
+            psuNmeaInfo->suNmeaGPRMC.fLatitude
+            }
+        else
+            {
+            }
+
+        // Altitude
+        if (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
+            METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fAltitude)
+        else
+
+        // Course over the ground and speed
+        if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
+            psuNmeaInfo->suNmeaGPRMC.fTrack
+        else
+
+        // Calculate relative position
+        vCalcRel(&suAC.suPos,            &(psuCurrTarg->suPos),  &(psuCurrTarg->suAC2Target));
+        vCalcRel(&(psuCurrTarg->suPos),  &suAC.suPos,            &(psuCurrTarg->suTarget2AC));
+
+#endif
+
+        // See if in range of target
+        if (*pbInRange == bFALSE)
+            *pbInRange = (psuCurrTarg->suAC2Target.fRange <= fDumpRadius);
+
+        // Go to the next target
+        psuCurrTarg = psuCurrTarg->psuNext;
+        } // end while relative targets to calculate for
+
+    return;
+    } // end CalcTargetData();
+
+
+
+/* ------------------------------------------------------------------------ */
+
+void vCalcRel(SuPos *psuFrom, SuPos *psuTo, SuRelPos *psuRel)
+    {
+    double  dRelX, dRelY, dRelZ;
+    double  dAz,   dEl,   dRange;
+
+    // Calculate the vector from the psuFrom to the psuTo point.  The psuFrom
+    // point is always at the origin.  Note that this is an aproximation
+    // that doesn't take into account the curvature of the earth.
+    dRelX = (psuTo->dLon      - psuFrom->dLon) * 60.0 * cos(DEG_TO_RAD(psuTo->dLat));
+    dRelY = (psuTo->dLat      - psuFrom->dLat) * 60.0;
+    dRelZ = (psuTo->fAltitude - psuFrom->fAltitude) / 6080.0;
+
+    // Rotate about the heading, pitch, and roll axes. Order is important!
+    vRotate(&dRelX, &dRelY, -psuFrom->fHeading);
+    vRotate(&dRelY, &dRelZ,  psuFrom->fPitch);
+    vRotate(&dRelX, &dRelZ, -psuFrom->fRoll);
+
+    // Convert to polar coordinates
+    vXYZ_To_AzElDist(dRelX, dRelY, dRelZ, &dAz, &dEl, &dRange);
+    psuRel->fAz    = (float)fmod(dAz+360.0, 360.0);
+    psuRel->fEl    = (float)dEl;
+    psuRel->fRange = (float)dRange;
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+/* Take a position in XY coordinates and rotate it by the given angle.
+   The rotation angle is in degrees, and positive rotation is clockwise. */
+
+void vRotate(double *pdXPos, double *pdYPos, double dRotateAngle)
+    {
+    double  dStartAngle;
+    double  dDistance;
+
+    // Convert to polar coordinates
+    dStartAngle = atan2(*pdYPos,*pdXPos);
+    dDistance   = sqrt((*pdXPos)*(*pdXPos)+(*pdYPos)*(*pdYPos));
+
+    // Subtract rotation angle and convert back to rectangular coordinates
+    *pdXPos = dDistance * cos(dStartAngle - DEG_TO_RAD(dRotateAngle));
+    *pdYPos = dDistance * sin(dStartAngle - DEG_TO_RAD(dRotateAngle));
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+/* Convert rectangular to polar coordinate system */
+
+void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
+                      double *pdAz, double *pdEl, double *pdDist)
+    {
+
+    *pdDist = sqrt(dX*dX + dY*dY + dZ*dZ);
+    *pdAz   = 90.0 - RAD_TO_DEG(atan2(dY, dX));
+    *pdEl   = RAD_TO_DEG(asin(dZ/(*pdDist)));
+
+    return;
+    }
+
+
