@@ -607,13 +607,13 @@ int iFindFirstTime(int iI106Handle)
 void vUsage(void)
     {
     printf("\nI106TRIM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-    printf("Trim a Ch 10 data file based on time\n");
+    printf("Trim a Ch 10 data file based on time or file offset\n");
     printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
     printf("Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]\n");
     printf("  +hh:mm:ss - Start copy time\n");
     printf("  -hh:mm:ss - Stop copy time\n");
-    printf("  +<num>%   - Start copy at position <num> percent into the file\n");
-    printf("  -<num>%   - Stop copy at position <num> percent into the file\n");
+    printf("  +<num>%%   - Start copy at position <num> percent into the file\n");
+    printf("  -<num>%%   - Stop copy at position <num> percent into the file\n");
     printf("Or:    fftrim <infile> to get stats\n");
     return;
     }
