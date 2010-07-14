@@ -142,9 +142,9 @@ typedef struct {
     } SuPos;
 
 typedef struct {
-    int           bValidPos;
-    int           bValidAlt;
-    int           bValidHeading;
+    //int           bValidPos;
+    //int           bValidAlt;
+    //int           bValidHeading;
     SuPos         suPos;
     float         fSpeed;            // Ground speed
     } SuAC_Data;
@@ -153,6 +153,9 @@ typedef struct {
     float         fAz;               // Azimuth, 0 = North
     float         fEl;               // Elevation angle, + UP, - Down
     float         fRange;            // Range in nautical miles
+    int           bValidAz;
+    int           bValidEl;
+    int           bValidRange;
     } SuRelPos;
 
 typedef struct TargPosLL_S {
@@ -175,8 +178,6 @@ int             m_iI106Handle;
 int             m_bDumpGGA;
 int             m_bDumpRMC;
 
-SuTargPosLL   * m_psuFirstTarg = NULL;
-
 /*
  * Function prototypes
  * -------------------
@@ -185,8 +186,8 @@ SuTargPosLL   * m_psuFirstTarg = NULL;
 void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 
 void ClearNmeaInfo(SuNmeaInfo * psuNmeaInfo);
-void DisplayTitles(FILE * psuOutFile);
-void DisplayData(SuNmeaInfo * psuNmeaInfo, FILE * psuOutFile);
+void DisplayTitles(SuTargPosLL * psuFirstTarg, FILE * psuOutFile);
+void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * psuOutFile);
 
 // NMEA string routines
 int  iDecodeNmeaTime(const char * szNmea);
@@ -246,7 +247,9 @@ int main(int argc, char ** argv)
 
     // Ground target info
     float               fDumpRadius = 0;
-    SuTargPosLL      ** ppsuCurrTarg = &m_psuFirstTarg;
+    SuTargPosLL       * psuFirstTarg = NULL;
+
+    SuTargPosLL      ** ppsuCurrTarg = &psuFirstTarg;
     SuTargPosLL       * psuCurrTarg;
     int                 bInRange = bTRUE;
 
@@ -468,9 +471,9 @@ int main(int argc, char ** argv)
     if (psuOutFile != stderr)
         fprintf(psuOutFile,"Input Data file '%s'\n", szInFile);
 
-    if (m_psuFirstTarg != NULL) 
+    if (psuFirstTarg != NULL) 
         {
-        psuCurrTarg = m_psuFirstTarg;
+        psuCurrTarg = psuFirstTarg;
         while (psuCurrTarg != NULL) 
             {
             fprintf(psuOutFile,"Ground Target   Lat %12.6f  Lon %12.6f  Elev %5.0f\n",
@@ -489,7 +492,7 @@ int main(int argc, char ** argv)
     fprintf(psuOutFile,"\n\n");
 
     // Print column titles. Harder than it sounds.
-    DisplayTitles(psuOutFile);
+    DisplayTitles(psuFirstTarg, psuOutFile);
 
 /*
  * Read messages until error or EOF
@@ -599,9 +602,9 @@ int main(int argc, char ** argv)
                                         (iSeconds != suNmeaInfo.iSeconds))
                                         {
                                         // If we've got targets then do some calculations
-                                        if (m_psuFirstTarg != NULL)
-                                            CalcTargetData(&suNmeaInfo, m_psuFirstTarg, fDumpRadius, &bInRange);
-                                        DisplayData(&suNmeaInfo, psuOutFile);
+                                        if (psuFirstTarg != NULL)
+                                            CalcTargetData(&suNmeaInfo, psuFirstTarg, fDumpRadius, &bInRange);
+                                        DisplayData(&suNmeaInfo, psuFirstTarg, psuOutFile);
                                         ClearNmeaInfo(&suNmeaInfo);
                                         }
 
@@ -1162,7 +1165,7 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 /* ------------------------------------------------------------------------ */
 
 // Print out data column headers
-void DisplayTitles(FILE * psuOutFile)
+void DisplayTitles(SuTargPosLL * psuFirstTarg, FILE * psuOutFile)
     {
     int             iIdx;
     int             iDumpRelIdx;
@@ -1220,7 +1223,7 @@ void DisplayTitles(FILE * psuOutFile)
             if (iIdx==4)    fprintf(psuOutFile,"           (kts)  ");
             }
 
-        psuCurrTarg  = m_psuFirstTarg;
+        psuCurrTarg  = psuFirstTarg;
         iDumpRelIdx = 1;
         while (psuCurrTarg != NULL) 
             {
@@ -1230,7 +1233,7 @@ void DisplayTitles(FILE * psuOutFile)
                 if (iIdx==1)                  fprintf(psuOutFile," ------ Ground Target %d -------", iDumpRelIdx);
                 if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to  Bearing");
                 if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
-                if (iIdx==4)                  fprintf(psuOutFile,"         (true)           (true)");
+                if (iIdx==4)                  fprintf(psuOutFile,"  (nm)   (true)           (true)");
 //                                                               " ----.-  ---.-   ---.-    ---.- "
                 }
             else
@@ -1238,7 +1241,7 @@ void DisplayTitles(FILE * psuOutFile)
                 if (iIdx==1)                  fprintf(psuOutFile," -- Ground Target %d --", iDumpRelIdx);
                 if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to");
                 if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C  ");
-                if (iIdx==4)                  fprintf(psuOutFile,"         (true)        ");
+                if (iIdx==4)                  fprintf(psuOutFile,"  (nm)   (true)        ");
 //                                                               " ----.-  ---.-   ---.- "
                 }
 
@@ -1257,8 +1260,9 @@ void DisplayTitles(FILE * psuOutFile)
 
 /* ------------------------------------------------------------------------ */
 
-void DisplayData(SuNmeaInfo * psuNmeaInfo, FILE * psuOutFile)
+void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * psuOutFile)
     {
+    SuTargPosLL   * psuCurrTarg;
 
     // Date, only valid if GPRMC valid
     if (m_bDumpRMC)
@@ -1310,6 +1314,54 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo, FILE * psuOutFile)
                 psuNmeaInfo->suNmeaGPRMC.fTrack, psuNmeaInfo->suNmeaGPRMC.fSpeed);
         else
             fprintf(psuOutFile,"  -----    ------ ");
+        }
+
+    psuCurrTarg  = psuFirstTarg;
+    while (psuCurrTarg != NULL) 
+        {
+        char    szRange[10];
+        char    szAz2AC[10];
+        char    szEl2AC[10];
+        char    szBearing2Targ[10];
+
+        // First make invalid data versions of target relative data
+        strcpy(szRange, " ----.- ");
+        strcpy(szAz2AC, " ---.- ");
+        strcpy(szEl2AC, "  ---.- ");
+        strcpy(szBearing2Targ, "   ---.- ");
+
+        // Now make string versions of the target relative data for valid data
+        if (psuCurrTarg->suTarget2AC.bValidRange)
+            sprintf(szRange, " %6.1f ", psuCurrTarg->suTarget2AC.fRange);
+        if (psuCurrTarg->suTarget2AC.bValidAz)
+            sprintf(szRange, " %5.1f ", psuCurrTarg->suTarget2AC.fAz);
+        if (psuCurrTarg->suTarget2AC.bValidEl)
+            sprintf(szRange, "  %5.1f ", psuCurrTarg->suTarget2AC.fEl);
+        if (psuCurrTarg->suAC2Target.bValidAz)
+            sprintf(szRange, "   %5.1f ", psuCurrTarg->suAC2Target.fAz);
+
+        // If we get course over the ground then print out relative bearing
+        if (m_bDumpRMC)
+                {
+//              fprintf(psuOutFile," ------ Ground Target %d -------", iDumpRelIdx);
+//              fprintf(psuOutFile," Range   Az to  Elev to  Bearing");
+//              fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
+//              fprintf(psuOutFile,"         (true)                 ");
+//                                 " ----.-  ---.-   ---.-    ---.- "
+            fprintf(psuOutFile," %6.1f  %5.1f   %5.1f    %5.1f ");
+            }
+        else
+            {
+//              fprintf(psuOutFile," -- Ground Target %d --", iDumpRelIdx);
+//              fprintf(psuOutFile," Range   Az to  Elev to");
+//              fprintf(psuOutFile," to A/C   A/C     A/C  ");
+//              fprintf(psuOutFile,"         (true)        ");
+//                                 " ----.-  ---.-   ---.- "
+            fprintf(psuOutFile," %6.1f  %5.1f   %5.1f ",
+                psuCurrTarg->suTarget2AC.fRange, psuCurrTarg->suTarget2AC.fAz, psuCurrTarg->suTarget2AC.fEl);
+            }
+
+        psuCurrTarg = psuCurrTarg->psuNext;
         }
 
     fprintf(psuOutFile,"\n");
@@ -1409,12 +1461,11 @@ void CalculexGpsFix(char * achNmeaBuff, int iBuffLen)
 // full 6DOF provided by a true INS.
 void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float fDumpRadius, int * pbInRange)
     {
-    SuAC_Data   suGPS;
+    int             bValidPos;
+    int             bValidAlt;
+    int             bValidHeading;
 
-//    SuAC_Data;
-
-//    SuRelPos;
-
+    SuAC_Data       suGPS;
     SuTargPosLL   * psuCurrTarg;
 
     // If dump radius not used then we are always in range
@@ -1428,17 +1479,17 @@ void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float 
         {
         suGPS.suPos.dLon = psuNmeaInfo->suNmeaGPGGA.fLongitude;
         suGPS.suPos.dLat = psuNmeaInfo->suNmeaGPGGA.fLatitude;
-        suGPS.bValidPos  = bTRUE;
+        bValidPos = bTRUE;
         }
     else if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
         {
         suGPS.suPos.dLon = psuNmeaInfo->suNmeaGPRMC.fLongitude;
         suGPS.suPos.dLat = psuNmeaInfo->suNmeaGPRMC.fLatitude;
-        suGPS.bValidPos  = bTRUE;
+        bValidPos = bTRUE;
         }
     else
         {
-        suGPS.bValidPos  = bFALSE;
+        bValidPos = bFALSE;
         return;
         }
 
@@ -1446,24 +1497,24 @@ void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float 
     if (psuNmeaInfo->suNmeaGPGGA.bValid == bTRUE)
         {
         suGPS.suPos.fAltitude = (float)METERS_TO_FT(psuNmeaInfo->suNmeaGPGGA.fAltitude);
-        suGPS.bValidAlt       = bTRUE;
+        bValidAlt = bTRUE;
         }
     else
         {
         suGPS.suPos.fAltitude = 0.0;
-        suGPS.bValidAlt       = bFALSE;
+        bValidAlt = bFALSE;
         }
 
     // Track over the ground is approximately heading
     if (psuNmeaInfo->suNmeaGPRMC.bValid == bTRUE)
         {
         suGPS.suPos.fHeading = psuNmeaInfo->suNmeaGPRMC.fTrack;
-        suGPS.bValidHeading  = bTRUE;
+        bValidHeading = bTRUE;
         }
     else
         {
         suGPS.suPos.fHeading = 0.0;
-        suGPS.bValidHeading  = bFALSE;
+        bValidHeading = bFALSE;
         }
 
     // Roll and pitch assume straight and level
@@ -1474,6 +1525,14 @@ void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float 
     psuCurrTarg = psuFirstTarg;
     while (psuCurrTarg != NULL) 
         {
+        // Set valid flags based on info we have
+        psuCurrTarg->suTarget2AC.bValidAz    = bValidPos;
+        psuCurrTarg->suTarget2AC.bValidEl    = bValidAlt;
+        psuCurrTarg->suTarget2AC.bValidRange = bValidPos;
+        psuCurrTarg->suAC2Target.bValidAz    = bValidHeading;
+        psuCurrTarg->suAC2Target.bValidEl    = bFALSE;
+        psuCurrTarg->suAC2Target.bValidRange = bValidPos;
+
         // Calculate relative position
         vCalcRel(&suGPS.suPos,           &(psuCurrTarg->suPos),  &(psuCurrTarg->suAC2Target));
         vCalcRel(&(psuCurrTarg->suPos),  &suGPS.suPos,           &(psuCurrTarg->suTarget2AC));
