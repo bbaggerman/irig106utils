@@ -246,6 +246,7 @@ int main(int argc, char ** argv)
     int                     iSeconds;
 
     // Ground target info
+    int                 iTargIdx;
     float               fDumpRadius = 0;
     SuTargPosLL       * psuFirstTarg = NULL;
 
@@ -474,13 +475,16 @@ int main(int argc, char ** argv)
     if (psuFirstTarg != NULL) 
         {
         psuCurrTarg = psuFirstTarg;
+        iTargIdx = 1;
         while (psuCurrTarg != NULL) 
             {
-            fprintf(psuOutFile,"Ground Target   Lat %12.6f  Lon %12.6f  Elev %5.0f\n",
+            fprintf(psuOutFile,"Ground Target %d - Lat %12.6f  Lon %12.6f  Elev %5.0f\n",
+                iTargIdx,
                 psuCurrTarg->suPos.dLat,
                 psuCurrTarg->suPos.dLon, 
                 psuCurrTarg->suPos.fAltitude);
             psuCurrTarg = psuCurrTarg->psuNext;
+            iTargIdx++;
             } // end while relative targets to calculate for
         }
 
