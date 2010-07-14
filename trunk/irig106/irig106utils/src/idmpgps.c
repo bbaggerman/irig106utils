@@ -606,9 +606,11 @@ int main(int argc, char ** argv)
                                         (iSeconds != suNmeaInfo.iSeconds))
                                         {
                                         // If we've got targets then do some calculations
+                                        bInRange = bTRUE;
                                         if (psuFirstTarg != NULL)
                                             CalcTargetData(&suNmeaInfo, psuFirstTarg, fDumpRadius, &bInRange);
-                                        DisplayData(&suNmeaInfo, psuFirstTarg, psuOutFile);
+                                        if (bInRange)
+                                            DisplayData(&suNmeaInfo, psuFirstTarg, psuOutFile);
                                         ClearNmeaInfo(&suNmeaInfo);
                                         }
 
@@ -1150,6 +1152,7 @@ $GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W,A*6A
 void DisplayTitles(SuTargPosLL * psuFirstTarg, FILE * psuOutFile)
     {
     int             iIdx;
+    char            szTargetTitle[100];
     int             iDumpRelIdx;
     SuTargPosLL   * psuCurrTarg;
 
@@ -1205,28 +1208,46 @@ void DisplayTitles(SuTargPosLL * psuFirstTarg, FILE * psuOutFile)
             if (iIdx==4)    fprintf(psuOutFile,"           (kts)  ");
             }
 
+        szTargetTitle[0] = '\0';
         psuCurrTarg  = psuFirstTarg;
         iDumpRelIdx = 1;
         while (psuCurrTarg != NULL) 
             {
-            // If we get course over the ground then print out relative bearing
-            if (m_bDumpRMC)
+            if (m_bDumpGGA || m_bDumpRMC)
                 {
-                if (iIdx==1)                  fprintf(psuOutFile," ------ Ground Target %d -------", iDumpRelIdx);
-                if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to  Bearing");
-                if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
-                if (iIdx==4)                  fprintf(psuOutFile,"  (nm)   (true)           (true)");
-//                                                               " ----.-  ---.-   ---.-    ---.- "
-                }
-            else
-                {
-                if (iIdx==1)                  fprintf(psuOutFile," -- Ground Target %d --", iDumpRelIdx);
-                if (iIdx==2)                  fprintf(psuOutFile," Range   Az to  Elev to");
-                if (iIdx==3)                  fprintf(psuOutFile," to A/C   A/C     A/C  ");
-                if (iIdx==4)                  fprintf(psuOutFile,"  (nm)   (true)        ");
-//                                                               " ----.-  ---.-   ---.- "
+                if (iIdx==1)    strcat(szTargetTitle, " --------------");
+                if (iIdx==2)    fprintf(psuOutFile,   " Range   Az to ");
+                if (iIdx==3)    fprintf(psuOutFile,   " to A/C   A/C  ");
+                if (iIdx==4)    fprintf(psuOutFile,   "  (nm)   (true)");
                 }
 
+            if (m_bDumpGGA)
+                {
+                if (iIdx==1)    strcat(szTargetTitle, "---------");
+                if (iIdx==2)    fprintf(psuOutFile,   " Elev to ");
+                if (iIdx==3)    fprintf(psuOutFile,   "   A/C   ");
+                if (iIdx==4)    fprintf(psuOutFile,   "         ");
+                }
+
+            if (m_bDumpRMC)
+                {
+                if (iIdx==1)    strcat(szTargetTitle, "--------");
+                if (iIdx==2)    fprintf(psuOutFile,   " Bearing");
+                if (iIdx==3)    fprintf(psuOutFile,   " to Targ");
+                if (iIdx==4)    fprintf(psuOutFile,   "  (true)");
+                }
+
+            if (iIdx==1)
+                {
+                int     iTitleStringOffset;
+                char    szTitle[100];
+                sprintf(szTitle, " Gnd Target %d ", iDumpRelIdx);
+                iTitleStringOffset = (int)(strlen(szTargetTitle) - strlen(szTitle)) / 2;
+                memcpy(&szTargetTitle[iTitleStringOffset], szTitle, strlen(szTitle));
+                fprintf(psuOutFile, "%s", szTargetTitle);
+                }
+
+            // Get the next target
             psuCurrTarg = psuCurrTarg->psuNext;
             iDumpRelIdx++;
             }
@@ -1322,26 +1343,16 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * ps
         if (psuCurrTarg->suAC2Target.bValidAz)
             sprintf(szBearing2Targ, "%5.1f", psuCurrTarg->suAC2Target.fAz);
 
-        // If we get course over the ground then print out relative bearing
-        if (m_bDumpRMC)
-                {
-//              fprintf(psuOutFile," ------ Ground Target %d -------", iDumpRelIdx);
-//              fprintf(psuOutFile," Range   Az to  Elev to  Bearing");
-//              fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
-//              fprintf(psuOutFile,"         (true)                 ");
-//                                 " ----.-  ---.-   ---.-    ---.- "
-            fprintf(psuOutFile," %6s  %5s   %5s    %5s ", szRange, szAz2AC, szEl2AC, szBearing2Targ);
-            }
-        else
-            {
-//              fprintf(psuOutFile," -- Ground Target %d --", iDumpRelIdx);
-//              fprintf(psuOutFile," Range   Az to  Elev to");
-//              fprintf(psuOutFile," to A/C   A/C     A/C  ");
-//              fprintf(psuOutFile,"         (true)        ");
-//                                 " ----.-  ---.-   ---.- "
-            fprintf(psuOutFile," %6s  %5s   %5s ", szRange, szAz2AC, szEl2AC);
-            }
+        if (m_bDumpGGA || m_bDumpRMC)
+            fprintf(psuOutFile," %6s  %5s ", szRange, szAz2AC);
 
+        if (m_bDumpGGA)
+            fprintf(psuOutFile,"  %5s ", szEl2AC);
+
+        if (m_bDumpRMC)
+            fprintf(psuOutFile,"   %5s ", szBearing2Targ);
+
+        // Get the next target
         psuCurrTarg = psuCurrTarg->psuNext;
         }
 
@@ -1608,15 +1619,17 @@ void vUsage(void)
     printf("Dump GPS position from a Ch 10 data file\n");
     printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
     printf("Usage: idmpgps <input file> <output file> [flags]\n");
-    printf("   <filename> Input/output file names        \n");
-    printf("   -v         Verbose                        \n");
-    printf("   -c ChNum   Channel Number (default all)   \n");
-    printf("   -G         Print NMEA GGA data            \n");
-    printf("   -C         Print NMEA RMC data            \n");
-    printf("   -T         Print TMATS summary and exit   \n");
-    printf("                                             \n");
-    printf("The output data fields are:                  \n");
-    printf("                                             \n");
+    printf("   <filename> Input/output file names                        \n");
+    printf("   -v               Verbose                                  \n");
+    printf("   -c ChNum         Channel Number (required)                \n");
+    printf("   -G               Print NMEA GGA data                      \n");
+    printf("   -C               Print NMEA RMC data                      \n");
+    printf("   -g Lat Lon Elev  Ground target position (ft)              \n");
+    printf("   -m Dist          Only dump within this many nautical miles\n");
+    printf("                      of ground target position. Can be used \n");
+    printf("                      multiple times for multiple ground     \n");
+    printf("                      targets.                               \n");
+    printf("   -T               Print TMATS summary and exit             \n");
     }
 
 
