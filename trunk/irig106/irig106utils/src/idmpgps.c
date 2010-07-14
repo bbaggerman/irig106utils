@@ -78,8 +78,8 @@
 
 #define DEG_TO_RAD(angle)     ((angle)*M_PI/180.0)
 #define RAD_TO_DEG(angle)     ((angle)*180.0/M_PI)
-#define FT_TO_METERS(ft)      ((ft)/0.3048)
-#define METERS_TO_FT(meters)  ((meters)*0.3048)
+#define FT_TO_METERS(ft)      ((ft)*0.3048)
+#define METERS_TO_FT(meters)  ((meters)/0.3048)
 #define SQUARED(value)        ((value)*(value))
 #define CUBED(value)          ((value)*(value)*(value))
 
@@ -304,7 +304,7 @@ int main(int argc, char ** argv)
                         m_bDumpRMC = bTRUE;
                         break;
 
-                    case 'g' :                   /* Ground target position */
+                    case 'g' :                   // Ground target position
                         *ppsuCurrTarg = malloc(sizeof(SuTargPosLL));
                         (*ppsuCurrTarg)->psuNext = NULL;
                         iArgIdx++;
@@ -319,7 +319,7 @@ int main(int argc, char ** argv)
                         ppsuCurrTarg = &((*ppsuCurrTarg)->psuNext);
                         break;
 
-                    case 'm' :                   /* Dump radius */
+                    case 'm' :                   // Dump radius
                         iArgIdx++;
                         sscanf(argv[iArgIdx],"%f",&fDumpRadius);
                         break;
@@ -717,28 +717,6 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
 
     return;
     }
-
-
-/* ------------------------------------------------------------------------ */
-
-void vUsage(void)
-    {
-    printf("\nIDMPGPS "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-    printf("Dump GPS position from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
-    printf("Usage: idmpgps <input file> <output file> [flags]\n");
-    printf("   <filename> Input/output file names        \n");
-    printf("   -v         Verbose                        \n");
-    printf("   -c ChNum   Channel Number (default all)   \n");
-    printf("   -G         Print NMEA GGA data            \n");
-    printf("   -C         Print NMEA RMC data            \n");
-    printf("   -T         Print TMATS summary and exit   \n");
-    printf("                                             \n");
-    printf("The output data fields are:                  \n");
-    printf("                                             \n");
-    }
-
-
 
 
 /* ------------------------------------------------------------------------ */
@@ -1325,20 +1303,20 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * ps
         char    szBearing2Targ[10];
 
         // First make invalid data versions of target relative data
-        strcpy(szRange, " ----.- ");
-        strcpy(szAz2AC, " ---.- ");
-        strcpy(szEl2AC, "  ---.- ");
-        strcpy(szBearing2Targ, "   ---.- ");
+        strcpy(szRange,       "----.-");
+        strcpy(szAz2AC,        "---.-");
+        strcpy(szEl2AC,        "---.-");
+        strcpy(szBearing2Targ, "---.-");
 
         // Now make string versions of the target relative data for valid data
         if (psuCurrTarg->suTarget2AC.bValidRange)
-            sprintf(szRange, " %6.1f ", psuCurrTarg->suTarget2AC.fRange);
+            sprintf(szRange, "%6.1f", psuCurrTarg->suTarget2AC.fRange);
         if (psuCurrTarg->suTarget2AC.bValidAz)
-            sprintf(szRange, " %5.1f ", psuCurrTarg->suTarget2AC.fAz);
+            sprintf(szAz2AC, "%5.1f", psuCurrTarg->suTarget2AC.fAz);
         if (psuCurrTarg->suTarget2AC.bValidEl)
-            sprintf(szRange, "  %5.1f ", psuCurrTarg->suTarget2AC.fEl);
+            sprintf(szEl2AC, "%5.1f", psuCurrTarg->suTarget2AC.fEl);
         if (psuCurrTarg->suAC2Target.bValidAz)
-            sprintf(szRange, "   %5.1f ", psuCurrTarg->suAC2Target.fAz);
+            sprintf(szBearing2Targ, "%5.1f", psuCurrTarg->suAC2Target.fAz);
 
         // If we get course over the ground then print out relative bearing
         if (m_bDumpRMC)
@@ -1348,7 +1326,7 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * ps
 //              fprintf(psuOutFile," to A/C   A/C     A/C    to Targ");
 //              fprintf(psuOutFile,"         (true)                 ");
 //                                 " ----.-  ---.-   ---.-    ---.- "
-            fprintf(psuOutFile," %6.1f  %5.1f   %5.1f    %5.1f ");
+            fprintf(psuOutFile," %6s  %5s   %5s    %5s ", szRange, szAz2AC, szEl2AC, szBearing2Targ);
             }
         else
             {
@@ -1357,8 +1335,7 @@ void DisplayData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, FILE * ps
 //              fprintf(psuOutFile," to A/C   A/C     A/C  ");
 //              fprintf(psuOutFile,"         (true)        ");
 //                                 " ----.-  ---.-   ---.- "
-            fprintf(psuOutFile," %6.1f  %5.1f   %5.1f ",
-                psuCurrTarg->suTarget2AC.fRange, psuCurrTarg->suTarget2AC.fAz, psuCurrTarg->suTarget2AC.fEl);
+            fprintf(psuOutFile," %6s  %5s   %5s ", szRange, szAz2AC, szEl2AC);
             }
 
         psuCurrTarg = psuCurrTarg->psuNext;
@@ -1490,7 +1467,6 @@ void CalcTargetData(SuNmeaInfo * psuNmeaInfo, SuTargPosLL * psuFirstTarg, float 
     else
         {
         bValidPos = bFALSE;
-        return;
         }
 
     // Altitude
@@ -1617,5 +1593,28 @@ void vXYZ_To_AzElDist(double dX,    double dY,    double dZ,
 
     return;
     }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+void vUsage(void)
+    {
+    printf("\nIDMPGPS "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Dump GPS position from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
+    printf("Usage: idmpgps <input file> <output file> [flags]\n");
+    printf("   <filename> Input/output file names        \n");
+    printf("   -v         Verbose                        \n");
+    printf("   -c ChNum   Channel Number (default all)   \n");
+    printf("   -G         Print NMEA GGA data            \n");
+    printf("   -C         Print NMEA RMC data            \n");
+    printf("   -T         Print TMATS summary and exit   \n");
+    printf("                                             \n");
+    printf("The output data fields are:                  \n");
+    printf("                                             \n");
+    }
+
+
 
 
