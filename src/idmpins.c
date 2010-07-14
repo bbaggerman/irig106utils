@@ -78,8 +78,8 @@
 
 #define DEG_TO_RAD(angle)     ((angle)*M_PI/180.0)
 #define RAD_TO_DEG(angle)     ((angle)*180.0/M_PI)
-#define FT_TO_METERS(ft)      ((ft)/0.3048)
-#define METERS_TO_FT(meters)  ((meters)*0.3048)
+#define FT_TO_METERS(ft)      ((ft)*0.3048)
+#define METERS_TO_FT(meters)  ((meters)/0.3048)
 #define SQUARED(value)        ((value)*(value))
 #define CUBED(value)          ((value)*(value)*(value))
 
