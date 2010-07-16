@@ -2,7 +2,7 @@
 IRIG 106 Utilities
 ==================
 
-Copyright (C) 2006 Irig106.org
+Copyright (C) 2010 Irig106.org
 
 Introduction
 ------------
@@ -28,17 +28,22 @@ Usage: i106stat <input file> <output file> [flags]
 I106TRIM
 --------
 
-Trim a data file based on start and/or stop time. It is assumed the day is the
-same as the starting day.  If the stop time is less than the start time, it is
-assumed that the time spans midnight. In this case stop time is the next day.
+Trim a data file based on start and/or stop time, or file offset. It 
+is assumed the day is the same as the starting day.  If the stop time 
+is less than the start time, it is assumed that the time spans 
+midnight. In this case stop time is the next day.
 
 There are some new requirements for modifying or adding TMATS records when
 rewriting data files. This utility makes no attempt to modify TMATS and so
-technically my result in a non-IRIG106 compliant data file.
+technically may result in a non-IRIG106 compliant data file.
 
 Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]
   +hh:mm:ss - Start copy time
   -hh:mm:ss - Stop copy time
+  +<num>%   - Start copy at position <num> percent into the file
+  -<num>%   - Stop copy at position <num> percent into the file
+
+Or:    fftrim <infile> to get stats
 
 
 IDMPTMATS
@@ -123,6 +128,33 @@ Usage: idmpins <input file> <output file> [flags]
                       of ground target position
    -T               Print TMATS summary and exit
 
+IDMPGPS
+-------
+
+Read GPS NMEA strings from a UART channel.  NMEA GPGGA and GPRMC sentences
+are supported, and it is assumed both are available.  Use the "-G" flag to
+restrict output to just those data fields supported by GPGGA.  Use the "-C"
+flag to restrict output to data fields supported by GPRMC.
+
+The -g flag can be used to specify a reference position on the ground. More
+than one reference position can be specified by using multiple -g flags.
+When one or more reference positions are defined, the GPS output will also
+include position and attitude information relative to that point.  The -m 
+flag can be used to only dump GPS data points when within a prescribed 
+distance from the reference point.
+
+Usage: idmpgps <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v               Verbose
+   -c ChNum         Channel Number (required)
+   -G               Print NMEA GGA data
+   -C               Print NMEA RMC data
+   -g Lat Lon Elev  Ground target position (ft)
+   -m Dist          Only dump within this many nautical miles
+                      of ground target position
+   -T               Print TMATS summary and exit
+
+
 IDMPUART
 --------
 
@@ -148,3 +180,46 @@ Usage: idmpUART <input file> <output file> [flags]
 
 The output data fields are:
   Time Chan-Subchan Data...
+
+
+IDMPTIME
+--------
+
+Read and dump time packets.  This is useful for debugging time problems.
+
+Usage: idmptime <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -T         Print TMATS summary and exit
+
+Time columns are:
+  Channel ID
+  Relative Time Counter Value
+  Time
+  Time Source
+  Time Format
+  Leap Year Flag
+
+
+IDMP429
+-------
+
+Read and dump ARINC 429 packets.  Use the "-c" flag to restrict dumps to
+a specific channel number.  Each channel may have multiple 429 buses.  Use
+the "-b" flag to restrict dumps to a specific 429 bus.
+
+Usage: idmpa429 <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -b BusNum  429 Bus Number (default all)
+   -T         Print TMATS summary and exit
+
+The output data fields are:
+Time  ChanID  BusNum  Label  SDI  Data  SSM
+
+
+IDMPETH
+-------
+
