@@ -89,7 +89,7 @@
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
 
@@ -101,7 +101,7 @@ int main(int argc, char ** argv)
     char                    szInFile[80];     // Input file name
     char                    szOutFile[80];    // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;        // Output file handle
+    FILE                  * psuOutFile;        // Output file handle
 //    char                  * szTime;
 //    int                     iMilliSec;
     int                     iChannel;         // Channel number
@@ -213,8 +213,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"wb");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"wb");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -224,7 +224,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -259,7 +259,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -335,7 +335,7 @@ int main(int argc, char ** argv)
 
                     // Copy of output buffer, swapping bytes as we go
                     swab(suCurrMsgF0.pachTSData, achTSBuff, 188);
-                    fwrite(achTSBuff, 188, 1, ptOutFile);
+                    fwrite(achTSBuff, 188, 1, psuOutFile);
 
                     // Get the next video packet
                     enStatus = enI106_Decode_NextVideoF0(&suI106Hdr, &suCurrMsgF0);
@@ -368,7 +368,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(hI106In);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -377,7 +377,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -389,13 +389,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= Video Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= Video Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -419,9 +419,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"VIDIN") == 0)
                     {
 //                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);

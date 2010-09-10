@@ -121,8 +121,8 @@ int                 m_bVerbose;
  * -------------------
  */
 
-void     vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile);
-void     vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void     vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile);
+void     vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void     vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[]);
 void     vUsage(void);
 
@@ -144,7 +144,7 @@ int main(int argc, char ** argv)
     unsigned long           ulBadPackets;
     unsigned long           ulTotal;
 
-    FILE                  * ptOutFile;        // Output file handle
+    FILE                  * psuOutFile;        // Output file handle
     int                     hI106In;
     char                    szInFile[80];     // Input file name
     char                    szOutFile[80];    // Output file name
@@ -276,8 +276,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -287,7 +287,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -509,19 +509,19 @@ int main(int argc, char ** argv)
  * ---------------------------------------
  */
 
-//    vPrintTmats(&suTmatsInfo, ptOutFile);
+//    vPrintTmats(&suTmatsInfo, psuOutFile);
 
-    fprintf(ptOutFile,"\n=-=-= Message Totals by Channel and Type =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= Message Totals by Channel and Type =-=-=\n\n");
     for (uChanIdx=0; uChanIdx<0x1000; uChanIdx++)
         {
         if (apsuChanInfo[uChanIdx] != NULL)
             {
-            vPrintCounts(apsuChanInfo[uChanIdx], ptOutFile);
+            vPrintCounts(apsuChanInfo[uChanIdx], psuOutFile);
             }
         }
 
     
-    fprintf(ptOutFile,"=-=-= File Time Summary =-=-=\n\n");
+    fprintf(psuOutFile,"=-=-= File Time Summary =-=-=\n\n");
 
     enI106_Rel2IrigTime(hI106In, abyFileStartTime, &suIrigTime);
     if (suIrigTime.enFmt == I106_DATEFMT_DMY)
@@ -530,19 +530,19 @@ int main(int argc, char ** argv)
         szTimeFmt = szDayTimeFmt;
     psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
     strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"File Start %s\n",  szTime);
+    fprintf(psuOutFile,"File Start %s\n",  szTime);
 
     enI106_Rel2IrigTime(hI106In, abyStartTime, &suIrigTime);
     psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
     strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Start %s\n",  szTime);
+    fprintf(psuOutFile,"Data Start %s\n",  szTime);
 
     enI106_Rel2IrigTime(hI106In, abyStopTime, &suIrigTime);
     psuTmTime = gmtime((time_t *)&(suIrigTime.ulSecs));
     strftime(szTime, 50, szTimeFmt, psuTmTime);
-    fprintf(ptOutFile,"Data Stop  %s\n\n",  szTime);
+    fprintf(psuOutFile,"Data Stop  %s\n\n",  szTime);
 
-    fprintf(ptOutFile,"\nTOTAL RECORDS:    %10lu\n\n", ulTotal);
+    fprintf(psuOutFile,"\nTOTAL RECORDS:    %10lu\n\n", ulTotal);
 
 /*
  *  Free dynamic memory.
@@ -551,7 +551,7 @@ int main(int argc, char ** argv)
     free(pvBuff);
     pvBuff = NULL;
 
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -560,25 +560,25 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
+void vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile)
     {
     long            lMsgIdx;
 
     // Make Channel ID line lead-in string
-    fprintf(ptOutFile,"ChanID %3d : %s : %s\n", 
+    fprintf(psuOutFile,"ChanID %3d : %s : %s\n", 
         psuChanInfo->iChanID, psuChanInfo->szChanType, psuChanInfo->szChanName);
 
     if (psuChanInfo->ulTMATS != 0)
-        fprintf(ptOutFile,"    TMATS             %10lu\n",   psuChanInfo->ulTMATS);
+        fprintf(psuOutFile,"    TMATS             %10lu\n",   psuChanInfo->ulTMATS);
 
     if (psuChanInfo->ulEvents != 0)
-        fprintf(ptOutFile,"    Events            %10lu\n",   psuChanInfo->ulEvents);
+        fprintf(psuOutFile,"    Events            %10lu\n",   psuChanInfo->ulEvents);
 
     if (psuChanInfo->ulIndex != 0)
-        fprintf(ptOutFile,"    Index             %10lu\n",   psuChanInfo->ulIndex);
+        fprintf(psuOutFile,"    Index             %10lu\n",   psuChanInfo->ulIndex);
 
     if (psuChanInfo->ulIrigTime != 0)
-        fprintf(ptOutFile,"    IRIG Time         %10lu\n",   psuChanInfo->ulIrigTime);
+        fprintf(psuOutFile,"    IRIG Time         %10lu\n",   psuChanInfo->ulIrigTime);
 
     if ((psuChanInfo->psu1553Info != NULL)  &&
         (psuChanInfo->psu1553Info->ulTotalBusMsgs != 0))
@@ -589,7 +589,7 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
             {
             if (psuChanInfo->psu1553Info->aulMsgs[lMsgIdx] != 0) 
                 {
-                fprintf(ptOutFile,"    RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
+                fprintf(psuOutFile,"    RT %2d  %c  SA %2d  Msgs %9lu  Errs %9lu\n",
                     (lMsgIdx >>  6) & 0x001f,
                     (lMsgIdx >>  5) & 0x0001 ? 'T' : 'R',
                     (lMsgIdx      ) & 0x001f,
@@ -598,45 +598,45 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
                 } // end if count not zero
             } // end for each combination
 
-//      fprintf(ptOutFile,"  Manchester Errors :   %10lu\n", psuChanInfo->ulErrManchester);
-//      fprintf(ptOutFile,"  Parity Errors     :   %10lu\n", psuChanInfo->ulErrParity);
-//      fprintf(ptOutFile,"  Overrun Errors    :   %10lu\n", psuChanInfo->ulErrOverrun);
-//      fprintf(ptOutFile,"  Timeout Errors    :   %10lu\n", psuChanInfo->ulErrTimeout);
+//      fprintf(psuOutFile,"  Manchester Errors :   %10lu\n", psuChanInfo->ulErrManchester);
+//      fprintf(psuOutFile,"  Parity Errors     :   %10lu\n", psuChanInfo->ulErrParity);
+//      fprintf(psuOutFile,"  Overrun Errors    :   %10lu\n", psuChanInfo->ulErrOverrun);
+//      fprintf(psuOutFile,"  Timeout Errors    :   %10lu\n", psuChanInfo->ulErrTimeout);
 
         if (psuChanInfo->psu1553Info->bRT2RTFound == bTRUE) 
             {
-            fprintf(ptOutFile,"\n  Warning - RT to RT transfers found in the data\n");
+            fprintf(psuOutFile,"\n  Warning - RT to RT transfers found in the data\n");
             if (m_bLogRT2RT == bTRUE)
-                fprintf(ptOutFile,"    Message total is NOT the sum of individual RT totals\n");
+                fprintf(psuOutFile,"    Message total is NOT the sum of individual RT totals\n");
             else 
-                fprintf(ptOutFile,"    Some transmit RTs may not be shown\n");
+                fprintf(psuOutFile,"    Some transmit RTs may not be shown\n");
             } // end if RT to RT
 
-        fprintf(ptOutFile,"    Totals - %ld Message in %ld good IRIG packets, %ld bad packets\n",
+        fprintf(psuOutFile,"    Totals - %ld Message in %ld good IRIG packets, %ld bad packets\n",
             psuChanInfo->psu1553Info->ulTotalBusMsgs,
             psuChanInfo->psu1553Info->ulTotalIrigPackets,
             psuChanInfo->psu1553Info->ulTotalIrigPacketErrors);
         } // end if 1553 messages
 
     if (psuChanInfo->ulPCM != 0)
-        fprintf(ptOutFile,"    PCM               %10lu\n",   psuChanInfo->ulPCM);
+        fprintf(psuOutFile,"    PCM               %10lu\n",   psuChanInfo->ulPCM);
 
     if (psuChanInfo->ulAnalog != 0)
-        fprintf(ptOutFile,"    Analog            %10lu\n",   psuChanInfo->ulAnalog);
+        fprintf(psuOutFile,"    Analog            %10lu\n",   psuChanInfo->ulAnalog);
 
     if (psuChanInfo->ulMPEG2 != 0)
-        fprintf(ptOutFile,"    MPEG Video        %10lu\n",   psuChanInfo->ulMPEG2);
+        fprintf(psuOutFile,"    MPEG Video        %10lu\n",   psuChanInfo->ulMPEG2);
 
     if (psuChanInfo->ulUART != 0)
-        fprintf(ptOutFile,"    UART              %10lu\n",   psuChanInfo->ulUART);
+        fprintf(psuOutFile,"    UART              %10lu\n",   psuChanInfo->ulUART);
 
     if (psuChanInfo->ulUserDefined != 0)
-        fprintf(ptOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
+        fprintf(psuOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
 
     if (psuChanInfo->ulOther != 0)
-        fprintf(ptOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
+        fprintf(psuOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
 
-    fprintf(ptOutFile,"\n",   psuChanInfo->ulOther);
+    fprintf(psuOutFile,"\n",   psuChanInfo->ulOther);
     return;
     }
 
@@ -645,7 +645,7 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * ptOutFile)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -657,13 +657,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"IRIG 106 Rev - %s\n",psuTmatsInfo->psuFirstGRecord->szIrig106Rev);
-    fprintf(ptOutFile,"Channel  Type          Data Source         \n");
-    fprintf(ptOutFile,"-------  ------------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"IRIG 106 Rev - %s\n",psuTmatsInfo->psuFirstGRecord->szIrig106Rev);
+    fprintf(psuOutFile,"Channel  Type          Data Source         \n");
+    fprintf(psuOutFile,"-------  ------------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -684,10 +684,10 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
             do  {
                 if (psuRDataSource == NULL) break;
 //                iRDsiIndex = psuRDataSource->iDataSourceNum;
-                fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                fprintf(ptOutFile,"  %-12s", psuRDataSource->szChannelDataType);
-                fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                fprintf(ptOutFile,"\n");
+                fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                fprintf(psuOutFile,"  %-12s", psuRDataSource->szChannelDataType);
+                fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                fprintf(psuOutFile,"\n");
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 

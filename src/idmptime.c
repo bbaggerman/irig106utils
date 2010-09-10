@@ -88,7 +88,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
 
@@ -100,7 +100,7 @@ int main(int argc, char ** argv)
     char                    szInFile[256];     // Input file name
     char                    szOutFile[256];    // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;        // Output file handle
+    FILE                  * psuOutFile;        // Output file handle
     int                     iChannel;         // Channel number
     unsigned long           lMsgs = 0;        // Total message
     unsigned long           lTimeMsgs = 0;    // Total time messages
@@ -223,8 +223,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -234,7 +234,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -269,7 +269,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -329,14 +329,14 @@ int main(int argc, char ** argv)
                 if (enStatus != I106_OK)
                     break;
 
-                fprintf(ptOutFile,"%3d ", suI106Hdr.uChID);
+                fprintf(psuOutFile,"%3d ", suI106Hdr.uChID);
 
                 // Print Channel ID
 
                 // Print out the relative time value
                 vTimeArray2LLInt(suI106Hdr.aubyRefTime, &llRelTime);
-//              fprintf(ptOutFile,"0x%12.12llx ", llRelTime);
-                fprintf(ptOutFile,"%14lld ", llRelTime);
+//              fprintf(psuOutFile,"0x%12.12llx ", llRelTime);
+                fprintf(psuOutFile,"%14lld ", llRelTime);
 
                 // Time in Day format
                 if (psuChanSpecTime->uDateFmt == 0)
@@ -363,7 +363,7 @@ int main(int argc, char ** argv)
                     //    suTmTime.tm_year  = 71;  // i.e. 1971, not a leap year
                     //    }
 
-                    fprintf(ptOutFile,"%3.3d:%2.2d:%2.2d:%2.2d", iYDay, iHour, iMin, iSec);
+                    fprintf(psuOutFile,"%3.3d:%2.2d:%2.2d:%2.2d", iYDay, iHour, iMin, iSec);
                     }
 
                 // Time in DMY format
@@ -377,26 +377,26 @@ int main(int argc, char ** argv)
                     iMon   = psuTimeDmy->uTOn *   10 + psuTimeDmy->uOn - 1;
                     iYear  = psuTimeDmy->uOYn * 1000 + psuTimeDmy->uHYn * 100 + 
                                         psuTimeDmy->uTYn *   10 + psuTimeDmy->uYn - 1900;
-                    fprintf(ptOutFile,"%2.2d/%2.2d/%4.4d %2.2d:%2.2d:%2.2d", iMDay, iMon, iYear, iHour, iMin, iSec);
+                    fprintf(psuOutFile,"%2.2d/%2.2d/%4.4d %2.2d:%2.2d:%2.2d", iMDay, iMon, iYear, iHour, iMin, iSec);
                     }
 
                 // Print various status flags
                 switch (psuChanSpecTime->uTimeSrc)
                     {
                     case I106_TIMESRC_INTERNAL     :
-                        fprintf(ptOutFile," Internal/Unlocked");
+                        fprintf(psuOutFile," Internal/Unlocked");
                         break;
                     case I106_TIMESRC_EXTERNAL     :
-                        fprintf(ptOutFile," External/Locked  ");
+                        fprintf(psuOutFile," External/Locked  ");
                         break;
                     case I106_TIMESRC_INTERNAL_RMM :
-                        fprintf(ptOutFile," Internal/RMM     ");
+                        fprintf(psuOutFile," Internal/RMM     ");
                         break;
                     case I106_TIMESRC_NONE         :
-                        fprintf(ptOutFile," None             ");
+                        fprintf(psuOutFile," None             ");
                         break;
                     default                        :
-                        fprintf(ptOutFile," Source Unknown   ");
+                        fprintf(psuOutFile," Source Unknown   ");
                         break;
 
                     } // end switch on Time Source
@@ -404,35 +404,35 @@ int main(int argc, char ** argv)
                 switch (psuChanSpecTime->uTimeFmt)
                     {
                     case I106_TIMEFMT_IRIG_B     :
-                        fprintf(ptOutFile," IRIG-B        ");
+                        fprintf(psuOutFile," IRIG-B        ");
                         break;
                     case I106_TIMEFMT_IRIG_A     :
-                        fprintf(ptOutFile," IRIG-A        ");
+                        fprintf(psuOutFile," IRIG-A        ");
                         break;
                     case I106_TIMEFMT_IRIG_G     :
-                        fprintf(ptOutFile," IRIG-G        ");
+                        fprintf(psuOutFile," IRIG-G        ");
                         break;
                     case I106_TIMEFMT_INT_RTC    :
-                        fprintf(ptOutFile," Internal Clock");
+                        fprintf(psuOutFile," Internal Clock");
                         break;
                     case I106_TIMEFMT_GPS_UTC    :
-                        fprintf(ptOutFile," UTC From GPS  ");
+                        fprintf(psuOutFile," UTC From GPS  ");
                         break;
                     case I106_TIMEFMT_GPS_NATIVE :
-                        fprintf(ptOutFile," Native GPS    ");
+                        fprintf(psuOutFile," Native GPS    ");
                         break;
                     default                      :
-                        fprintf(ptOutFile,"Format Unknown");
+                        fprintf(psuOutFile,"Format Unknown");
                         break;
                     } // end switch on Time Format
 
 
-                if (psuChanSpecTime->bLeapYear) fprintf(ptOutFile,"Leap Year");
-                else                            fprintf(ptOutFile,"Not Leap Year");
+                if (psuChanSpecTime->bLeapYear) fprintf(psuOutFile,"Leap Year");
+                else                            fprintf(psuOutFile,"Not Leap Year");
 
                 // Print out the data
-                fprintf(ptOutFile,"\n");
-                fflush(ptOutFile);
+                fprintf(psuOutFile,"\n");
+                fflush(psuOutFile);
 
                 lTimeMsgs++;
                 } // end if time packet 
@@ -462,7 +462,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -471,7 +471,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -482,13 +482,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -512,9 +512,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
                     {
 //                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
