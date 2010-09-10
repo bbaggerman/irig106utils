@@ -88,7 +88,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
 
@@ -100,7 +100,7 @@ int main(int argc, char ** argv)
     char                    szInFile[256];      // Input file name
     char                    szOutFile[256];     // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;          // Output file handle
+    FILE                  * psuOutFile;          // Output file handle
 
     int                     iChannel;           // Channel number
     unsigned long           lMsgs = 0;          // Total message
@@ -234,8 +234,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -245,7 +245,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -280,7 +280,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -346,21 +346,21 @@ int main(int argc, char ** argv)
                     if (bPrintRTC == bFALSE)
                         {
                         enI106_RelInt2IrigTime(m_iI106Handle, suUartMsg.suTimeRef.uRelTime, &suUartMsg.suTimeRef.suIrigTime);
-                        fprintf(ptOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
+                        fprintf(psuOutFile,"%s ", IrigTime2String(&suUartMsg.suTimeRef.suIrigTime));
                         }
                     else
                         {
-                        fprintf(ptOutFile,"%14lld ", suUartMsg.suTimeRef.uRelTime);
+                        fprintf(psuOutFile,"%14lld ", suUartMsg.suTimeRef.uRelTime);
                         }
 
                     // Print out the data
-                    fprintf(ptOutFile," Chan%d-%d",suI106Hdr.uChID, suUartMsg.psuUartHdr->uSubchannel);
+                    fprintf(psuOutFile," Chan%d-%d",suI106Hdr.uChID, suUartMsg.psuUartHdr->uSubchannel);
                     bWasPrintable = bFALSE;
                     for (iWordIdx=0; iWordIdx<suUartMsg.psuUartHdr->uDataLength; iWordIdx++) 
                         {
                         // Print out as hex characters
                         if (bString == bFALSE)
-                            fprintf(ptOutFile,"%2.2x ",suUartMsg.pauData[iWordIdx]);
+                            fprintf(psuOutFile,"%2.2x ",suUartMsg.pauData[iWordIdx]);
 
                         // Print out as a string
                         else
@@ -369,16 +369,16 @@ int main(int argc, char ** argv)
                             if (isprint(suUartMsg.pauData[iWordIdx]))
                                 {
                                 if (!bWasPrintable)
-                                    fprintf(ptOutFile," \"");
-                                fprintf(ptOutFile,"%c",    suUartMsg.pauData[iWordIdx]);
+                                    fprintf(psuOutFile," \"");
+                                fprintf(psuOutFile,"%c",    suUartMsg.pauData[iWordIdx]);
                                 }
 
                             // Unprintable characters
                             else
                                 {
                                 if (bWasPrintable)
-                                    fprintf(ptOutFile,"\" ");
-                                fprintf(ptOutFile,"0x%2.2x ",suUartMsg.pauData[iWordIdx]);
+                                    fprintf(psuOutFile,"\" ");
+                                fprintf(psuOutFile,"0x%2.2x ",suUartMsg.pauData[iWordIdx]);
                                 }
                             bWasPrintable = isprint(suUartMsg.pauData[iWordIdx]);
                             } // endif print string
@@ -386,10 +386,10 @@ int main(int argc, char ** argv)
                         } // end for all characters
 
                     if ((bString == bTRUE) && (bWasPrintable == bTRUE))
-                        fprintf(ptOutFile,"\"");
+                        fprintf(psuOutFile,"\"");
 
-                    fprintf(ptOutFile,"\n");
-                    fflush(ptOutFile);
+                    fprintf(psuOutFile,"\n");
+                    fflush(psuOutFile);
 
                     lUartMsgs++;
                     if (bVerbose) printf("%8.8ld UART Messages \r",lUartMsgs);
@@ -423,7 +423,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -432,7 +432,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -444,13 +444,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= UART Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= UART Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -474,9 +474,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"UARTIN") == 0)
                     {
 //                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);

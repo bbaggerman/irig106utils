@@ -89,7 +89,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
 
@@ -103,7 +103,7 @@ int main(int argc, char ** argv)
     char                    szIdxFileName[256];
     char                  * pchFileNameChar;
     int                     iArgIdx;
-    FILE                  * ptOutFile;        // Output file handle
+    FILE                  * psuOutFile;        // Output file handle
     char                  * szTime;
     int                     iWordIdx;
     int                     iMilliSec;
@@ -316,8 +316,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -327,7 +327,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -362,7 +362,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -444,10 +444,10 @@ int main(int argc, char ** argv)
                             szTime = ctime((time_t *)&suTime.ulSecs);
 							szTime[19] = '\0';
 							iMilliSec = (int)(suTime.ulFrac / 10000.0);
-                            fprintf(ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+                            fprintf(psuOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
 
                             // Print out the command word
-                            fprintf(ptOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
+                            fprintf(psuOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
                               suI106Hdr.uChID,
                               su1553Msg.psu1553Hdr->iBusID ? 'B' : 'A',
                               su1553Msg.psuCmdWord1->suStruct.uRTAddr,
@@ -465,28 +465,28 @@ int main(int argc, char ** argv)
                                 su1553Msg.psu1553Hdr->bMsgError     << 5  |
                                 su1553Msg.psu1553Hdr->bRT2RT        << 7;
                             if (bDecimal)
-                              fprintf(ptOutFile," %2d", uErrorFlags);
+                              fprintf(psuOutFile," %2d", uErrorFlags);
                             else
-                              fprintf(ptOutFile," %2.2x", uErrorFlags);
+                              fprintf(psuOutFile," %2.2x", uErrorFlags);
 
                             // Print out the status response
                             if (bStatusResponse == bTRUE)
                               if (bDecimal)
-                                fprintf(ptOutFile," %4d",*su1553Msg.puStatWord1);
+                                fprintf(psuOutFile," %4d",*su1553Msg.puStatWord1);
                               else
-                                fprintf(ptOutFile," %4.4x",*su1553Msg.puStatWord1);
+                                fprintf(psuOutFile," %4.4x",*su1553Msg.puStatWord1);
 
                             // Print out the data
 //                            iWordCnt = i1553WordCnt(ptCmdWord1->tStruct);
                             for (iWordIdx=0; iWordIdx<su1553Msg.uWordCnt; iWordIdx++) {
                               if (bDecimal)
-                                fprintf(ptOutFile," %5.5u",su1553Msg.pauData[iWordIdx]);
+                                fprintf(psuOutFile," %5.5u",su1553Msg.pauData[iWordIdx]);
                               else
-                                fprintf(ptOutFile," %4.4x",su1553Msg.pauData[iWordIdx]);
+                                fprintf(psuOutFile," %4.4x",su1553Msg.pauData[iWordIdx]);
                               }
 
-                            fprintf(ptOutFile,"\n");
-                            fflush(ptOutFile);
+                            fprintf(psuOutFile,"\n");
+                            fflush(psuOutFile);
 
                             l1553Msgs++;
                             if (bVerbose) printf("%8.8ld 1553 Messages \r",l1553Msgs);
@@ -532,7 +532,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -541,7 +541,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -553,13 +553,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -583,9 +583,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
                     {
 //                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5s ",   psuRDataSource->szTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);

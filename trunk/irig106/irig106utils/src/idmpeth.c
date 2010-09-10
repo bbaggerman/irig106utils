@@ -82,7 +82,7 @@ int           m_iVersion;    // Data file version
 int           m_usMaxBuffSize;
 
 int           m_iI106Handle;
-FILE        * m_ptOutFile;        // Output file handle
+FILE        * m_psuOutFile;        // Output file handle
 
 
 /*
@@ -245,8 +245,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        m_ptOutFile = fopen(szOutFile,"w");
-        if (m_ptOutFile == NULL) 
+        m_psuOutFile = fopen(szOutFile,"w");
+        if (m_psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -256,7 +256,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        m_ptOutFile = stdout;
+        m_psuOutFile = stdout;
         }
 
 
@@ -375,22 +375,22 @@ int main(int argc, char ** argv)
                     szTime = ctime((time_t *)&suTime.ulSecs);
 					szTime[19] = '\0';
 					iMilliSec = (int)(suTime.ulFrac / 10000.0);
-                    fprintf(m_ptOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+                    fprintf(m_psuOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
 #else
                     // Print out the time
                     enI106_Rel2IrigTime(m_iI106Handle,
                         suEthMsg.psuEthernetF0Hdr->aubyIntPktTime, &suTime);
                     szTime = IrigTime2String(&suTime);
-                    fprintf(m_ptOutFile,"%s", szTime);
+                    fprintf(m_psuOutFile,"%s", szTime);
 #endif
 
                     if ((suEthMsg.psuChanSpec->uFormat       == I106_ENET_FMT_PHYSICAL   ) &&
                         (suEthMsg.psuEthernetF0Hdr->uContent == I106_ENET_CONTENT_FULLMAC))
                         PrintEthernetFrame(&suEthMsg);
                     else
-                        fprintf(m_ptOutFile, "Unknown ethernet frame type\n");
+                        fprintf(m_psuOutFile, "Unknown ethernet frame type\n");
 
-                    fflush(m_ptOutFile);
+                    fflush(m_psuOutFile);
 
                     lEthMsgs++;
                     if (bVerbose) printf("%8.8ld 1553 Messages \r",lEthMsgs);
@@ -423,7 +423,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(m_ptOutFile);
+    fclose(m_psuOutFile);
 
     return 0;
     }
@@ -442,17 +442,17 @@ void PrintEthernetFrame(SuEthernetF0_CurrMsg * psuEthMsg)
 
     // Display ethernet frame type
     if (psuEthData->uTypeLen > 0x600)
-        fprintf(m_ptOutFile, " EthernetII");
+        fprintf(m_psuOutFile, " EthernetII");
     else
-        fprintf(m_ptOutFile, " 802.3     ");
+        fprintf(m_psuOutFile, " 802.3     ");
 
     // Destination ethernet address
-    fprintf(m_ptOutFile, " %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
+    fprintf(m_psuOutFile, " %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
         psuEthData->abyDestAddr[0], psuEthData->abyDestAddr[1], psuEthData->abyDestAddr[2],
         psuEthData->abyDestAddr[3], psuEthData->abyDestAddr[4], psuEthData->abyDestAddr[5]);
 
     // Source ethernet address
-    fprintf(m_ptOutFile, " %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
+    fprintf(m_psuOutFile, " %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
         psuEthData->abySrcAddr[0], psuEthData->abySrcAddr[1], psuEthData->abySrcAddr[2],
         psuEthData->abySrcAddr[3], psuEthData->abySrcAddr[4], psuEthData->abySrcAddr[5]);
 
@@ -460,20 +460,20 @@ void PrintEthernetFrame(SuEthernetF0_CurrMsg * psuEthMsg)
     switch (psuEthData->uTypeLen)
         {
         case 0x0800 : // IP
-            fprintf(m_ptOutFile, " IP    ");
+            fprintf(m_psuOutFile, " IP    ");
             break;
         case 0x0806 : // IP
-            fprintf(m_ptOutFile, " ARP   ");
+            fprintf(m_psuOutFile, " ARP   ");
             break;
         default :
             if (psuEthData->uTypeLen >= 0x0600)
-                fprintf(m_ptOutFile, " 0x%4x", psuEthData->uTypeLen);
+                fprintf(m_psuOutFile, " 0x%4x", psuEthData->uTypeLen);
             else
-                fprintf(m_ptOutFile, " 802.3 ");
+                fprintf(m_psuOutFile, " 802.3 ");
             break;
         } // end switch on type / length
 
-    fprintf(m_ptOutFile, "\n");
+    fprintf(m_psuOutFile, "\n");
 
     return;
     }
@@ -495,13 +495,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(m_ptOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
+    fprintf(m_psuOutFile,"\n=-=-= 1553 Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(m_ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(m_ptOutFile,"\n");
-    fprintf(m_ptOutFile,"Channel  Data Source         \n");
-    fprintf(m_ptOutFile,"-------  --------------------\n");
+    fprintf(m_psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(m_psuOutFile,"\n");
+    fprintf(m_psuOutFile,"Channel  Data Source         \n");
+    fprintf(m_psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -525,9 +525,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
                     {
                     iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(m_ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
-                    fprintf(m_ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(m_ptOutFile,"\n");
+                    fprintf(m_psuOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    fprintf(m_psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(m_psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);

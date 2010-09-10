@@ -89,7 +89,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile);
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
 
@@ -101,7 +101,7 @@ int main(int argc, char ** argv)
     char                    szInFile[256];     // Input file name
     char                    szOutFile[256];    // Output file name
     int                     iArgIdx;
-    FILE                  * ptOutFile;        // Output file handle
+    FILE                  * psuOutFile;        // Output file handle
     char                  * szTime;
     int                     iMilliSec;
     int                     iChannel;         // Channel number
@@ -233,8 +233,8 @@ int main(int argc, char ** argv)
     // If output file specified then open it    
     if (strlen(szOutFile) != 0)
         {
-        ptOutFile = fopen(szOutFile,"w");
-        if (ptOutFile == NULL) 
+        psuOutFile = fopen(szOutFile,"w");
+        if (psuOutFile == NULL) 
             {
             fprintf(stderr, "Error opening output file\n");
             return 1;
@@ -244,7 +244,7 @@ int main(int argc, char ** argv)
     // No output file name so use stdout
     else
         {
-        ptOutFile = stdout;
+        psuOutFile = stdout;
         }
 
 
@@ -279,7 +279,7 @@ int main(int argc, char ** argv)
                 return 1;
                 }
 
-            vPrintTmats(&suTmatsInfo, ptOutFile);
+            vPrintTmats(&suTmatsInfo, psuOutFile);
             } // end if TMATS
 
         // TMATS not first message
@@ -364,18 +364,18 @@ int main(int argc, char ** argv)
                         // Print out the time
                         enI106_RelInt2IrigTime(m_iI106Handle, suArinc429Msg.llIntPktTime, &suTime);
                         szTime = IrigTime2String(&suTime);
-                        fprintf(ptOutFile,"%s", szTime);
+                        fprintf(psuOutFile,"%s", szTime);
 
                         // Print out the data
-                        fprintf(ptOutFile," %5.1u",   suI106Hdr.uChID);
-                        fprintf(ptOutFile," %3.1u",   suArinc429Msg.psu429Hdr->uBusNum);
-                        fprintf(ptOutFile," %3.1u",   suArinc429Msg.psu429Data->uLabel);
-                        fprintf(ptOutFile," %1.1u",   suArinc429Msg.psu429Data->uSDI);
-                        fprintf(ptOutFile," 0x%5.5x", suArinc429Msg.psu429Data->uData);
-                        fprintf(ptOutFile," %1.1u",   suArinc429Msg.psu429Data->uSSM);
+                        fprintf(psuOutFile," %5.1u",   suI106Hdr.uChID);
+                        fprintf(psuOutFile," %3.1u",   suArinc429Msg.psu429Hdr->uBusNum);
+                        fprintf(psuOutFile," %3.1u",   suArinc429Msg.psu429Data->uLabel);
+                        fprintf(psuOutFile," %1.1u",   suArinc429Msg.psu429Data->uSDI);
+                        fprintf(psuOutFile," 0x%5.5x", suArinc429Msg.psu429Data->uData);
+                        fprintf(psuOutFile," %1.1u",   suArinc429Msg.psu429Data->uSSM);
 
-                        fprintf(ptOutFile,"\n");
-                        fflush(ptOutFile);
+                        fprintf(psuOutFile,"\n");
+                        fflush(psuOutFile);
 
                         l429Msgs++;
                         if (bVerbose) printf("%8.8ld AIRNC 429 Messages \r",l429Msgs);
@@ -411,7 +411,7 @@ int main(int argc, char ** argv)
  */
 
     enI106Ch10Close(m_iI106Handle);
-    fclose(ptOutFile);
+    fclose(psuOutFile);
 
     return 0;
     }
@@ -420,7 +420,7 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
+void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     {
     int                     iGIndex;
     int                     iRIndex;
@@ -432,13 +432,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(ptOutFile,"\n=-=-= ARINC 429 Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= ARINC 429 Channel Summary =-=-=\n\n");
 
     // G record
-    fprintf(ptOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
-    fprintf(ptOutFile,"\n");
-    fprintf(ptOutFile,"Channel  Data Source         \n");
-    fprintf(ptOutFile,"-------  --------------------\n");
+    fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile,"\n");
+    fprintf(psuOutFile,"Channel  Data Source         \n");
+    fprintf(psuOutFile,"-------  --------------------\n");
 
     // Data sources
     psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource;
@@ -462,9 +462,9 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * ptOutFile)
                 if (strcasecmp(psuRDataSource->szChannelDataType,"429IN") == 0)
                     {
                     iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(ptOutFile," %5i ",   psuRDataSource->iTrackNumber);
-                    fprintf(ptOutFile,"  %-20s", psuRDataSource->szDataSourceID);
-                    fprintf(ptOutFile,"\n");
+                    fprintf(psuOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
+                    fprintf(psuOutFile,"\n");
                     }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
