@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "02"
+#define MINOR_VERSION  "03"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -104,6 +104,7 @@ typedef struct
     unsigned long       ulPCM;
     unsigned long       ulMPEG2;
     unsigned long       ulUART;
+    unsigned long       ulEthernet;
     unsigned long       ulOther;
     } SuChanInfo;
 
@@ -487,6 +488,11 @@ int main(int argc, char ** argv)
                     apsuChanInfo[suI106Hdr.uChID]->ulUART++;
                     break;
 
+
+                case I106CH10_DTYPE_ETHERNET_FMT_0 :    // 0x68
+                    apsuChanInfo[suI106Hdr.uChID]->ulEthernet++;
+                    break;
+
                 default:
                     apsuChanInfo[suI106Hdr.uChID]->ulOther++;
                     break;
@@ -632,6 +638,9 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile)
 
     if (psuChanInfo->ulUserDefined != 0)
         fprintf(psuOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
+
+    if (psuChanInfo->ulEthernet != 0)
+        fprintf(psuOutFile,"    Ethernet          %10lu\n",   psuChanInfo->ulEthernet);
 
     if (psuChanInfo->ulOther != 0)
         fprintf(psuOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
