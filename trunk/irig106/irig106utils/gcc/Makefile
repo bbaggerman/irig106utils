@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 
 SRC_DIR=../src
-CFLAGS=-I../../irig106lib/src -I- -ggdb -fpack-struct=1
+CFLAGS=-iquote../../irig106lib/src -ggdb -fpack-struct=1
 LIBS=../../irig106lib/gcc/libirig106.a
 
 all: i106stat i106trim i106vid idmptmat idmp1553 idmpins idmpuart idmpeth idmp429
