@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -89,6 +89,7 @@ int           m_iI106Handle;
  * -------------------
  */
 
+unsigned char ReverseLabel(unsigned char uLabel);
 void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void vUsage(void);
 
@@ -369,7 +370,7 @@ int main(int argc, char ** argv)
                         // Print out the data
                         fprintf(psuOutFile," %5.1u",   suI106Hdr.uChID);
                         fprintf(psuOutFile," %3.1u",   suArinc429Msg.psu429Hdr->uBusNum);
-                        fprintf(psuOutFile," %3.1u",   suArinc429Msg.psu429Data->uLabel);
+                        fprintf(psuOutFile," %3.3o",   ReverseLabel((unsigned char)suArinc429Msg.psu429Data->uLabel));
                         fprintf(psuOutFile," %1.1u",   suArinc429Msg.psu429Data->uSDI);
                         fprintf(psuOutFile," 0x%5.5x", suArinc429Msg.psu429Data->uData);
                         fprintf(psuOutFile," %1.1u",   suArinc429Msg.psu429Data->uSSM);
@@ -478,6 +479,27 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
 
     return;
     }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+unsigned char ReverseLabel(unsigned char uLabel)
+    {
+    unsigned char   uRLabel;
+    int             iBitIdx;
+
+    uRLabel = 0;
+    for (iBitIdx=0; iBitIdx<8; iBitIdx++)
+        {
+        uRLabel <<= 1;
+        uRLabel  |= uLabel & 0x01;
+        uLabel  >>= 1;
+        }
+
+    return uRLabel;
+    }
+
 
 
 /* ------------------------------------------------------------------------ */
