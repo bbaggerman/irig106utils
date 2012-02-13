@@ -50,6 +50,7 @@
 
 #include "i106_decode_time.h"
 #include "i106_decode_1553f1.h"
+#include "i106_decode_arinc429.h"
 #include "i106_decode_tmats.h"
 
 
@@ -86,6 +87,13 @@ typedef struct
     int                 bRT2RTFound;
     } SuChanInfo1553;
 
+// ARINC 429 counts
+typedef struct
+    { 
+    unsigned long   aulMsgs[0x100][0x100];
+    } SuARINC429;
+
+
 // Per channel statistics
 typedef struct
   {
@@ -105,6 +113,7 @@ typedef struct
     unsigned long       ulMPEG2;
     unsigned long       ulUART;
     unsigned long       ulEthernet;
+    SuARINC429        * paARINC429;
     unsigned long       ulOther;
     } SuChanInfo;
 
@@ -116,6 +125,8 @@ typedef struct
 
 int                 m_bLogRT2RT;
 int                 m_bVerbose;
+unsigned char       m_aArincLabelMap[0x100];
+
 
 /*
  * Function prototypes
@@ -125,6 +136,7 @@ int                 m_bVerbose;
 void     vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile);
 void     vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile);
 void     vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[]);
+void     vMakeArincLabelMap(unsigned char m_aArincLabelMap[]);
 void     vUsage(void);
 
 
@@ -159,6 +171,7 @@ int main(int argc, char ** argv)
     EnI106Status            enStatus;
     SuI106Ch10Header        suI106Hdr;
     Su1553F1_CurrMsg        su1553Msg;
+    SuArinc429F0_CurrMsg    suArincMsg;
     SuTmatsInfo             suTmatsInfo;
     SuIrig106Time           suIrigTime;
     struct tm             * psuTmTime;
@@ -291,6 +304,8 @@ int main(int argc, char ** argv)
         psuOutFile = stdout;
         }
 
+    // Make the ARINC label map just in case
+    vMakeArincLabelMap(m_aArincLabelMap);
 
     fprintf(stderr, "Computing histogram...\n");
 
@@ -480,6 +495,36 @@ int main(int argc, char ** argv)
                     apsuChanInfo[suI106Hdr.uChID]->ulAnalog++;
                     break;
 
+                case I106CH10_DTYPE_ARINC_429_FMT_0 :   // 0x38
+                    // If first ARINC 429 message for this channel, setup the counts
+                    if (apsuChanInfo[suI106Hdr.uChID]->paARINC429 == NULL)
+                        {
+                        apsuChanInfo[suI106Hdr.uChID]->paARINC429 = 
+                            malloc(sizeof(SuARINC429));
+                        memset(apsuChanInfo[suI106Hdr.uChID]->paARINC429, 0x00, sizeof(SuARINC429));
+                        }
+
+                    // Step through all ARINC 429 messages
+                    enStatus = enI106_Decode_FirstArinc429F0(&suI106Hdr, pvBuff, &suArincMsg);
+                    if (enStatus == I106_OK)
+                        {
+                        while (enStatus == I106_OK)
+                            {
+                            unsigned char   uBus;
+                            unsigned char   uLabel;
+
+                            // Update message count
+                            uBus   = (unsigned char)suArincMsg.psu429Hdr->uBusNum;
+                            uLabel = (unsigned char)m_aArincLabelMap[suArincMsg.psu429Data->uLabel];
+                            apsuChanInfo[suI106Hdr.uChID]->paARINC429->aulMsgs[uBus][uLabel]++;
+
+                            // Get the next ARINC 429 message
+                            enStatus = enI106_Decode_NextArinc429F0(&suArincMsg);
+                            } // end while I106_OK
+                        } // end if Decode First ARINC 429 OK
+
+                    break;
+
                 case I106CH10_DTYPE_VIDEO_FMT_0 :       // 0x40
                     apsuChanInfo[suI106Hdr.uChID]->ulMPEG2++;
                     break;
@@ -630,6 +675,20 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile)
     if (psuChanInfo->ulAnalog != 0)
         fprintf(psuOutFile,"    Analog            %10lu\n",   psuChanInfo->ulAnalog);
 
+    if (psuChanInfo->paARINC429 != NULL)
+        {
+        unsigned int    uBus;
+        unsigned int    uLabel;
+        for (uBus=0; uBus<0x100; uBus++)
+            for (uLabel=0; uLabel<0x100; uLabel++)
+                {
+                if (psuChanInfo->paARINC429->aulMsgs[uBus][uLabel] != 0)
+                    fprintf(psuOutFile,"    ARINC 429  Subchan %3u  Label %3o    Msgs %10lu\n", uBus, uLabel, 
+                        psuChanInfo->paARINC429->aulMsgs[uBus][uLabel]);
+                }
+        }
+
+
     if (psuChanInfo->ulMPEG2 != 0)
         fprintf(psuOutFile,"    MPEG Video        %10lu\n",   psuChanInfo->ulMPEG2);
 
@@ -755,6 +814,35 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[])
         } // end while walking R record linked list
 
     return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
+// The ARINC 429 label field is bit reversed. This array maps the ARINC
+// label field to its non-reversed bretheren.
+
+void vMakeArincLabelMap(unsigned char m_aArincLabelMap[])
+    {
+    unsigned int    uLabelIdx;
+    unsigned char   uRLabel;
+    unsigned char   uLabel;
+    int             iBitIdx;
+
+    for (uLabelIdx=0; uLabelIdx<0x100; uLabelIdx++)
+        {
+        uLabel = (unsigned char)uLabelIdx;
+        uRLabel = 0;
+        for (iBitIdx=0; iBitIdx<8; iBitIdx++)
+            {
+            uRLabel <<= 1;
+            uRLabel  |= uLabel & 0x01;
+            uLabel  >>= 1;
+            } // end for each bit in the label
+        m_aArincLabelMap[uLabelIdx] = uRLabel;
+        } // end for each label
+
     }
 
 
