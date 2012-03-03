@@ -582,7 +582,7 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
     // Print out the TMATS info
     // ------------------------
 
-    fprintf(psuOutFile,"\n=-=-= ARINC 429 Channel Summary =-=-=\n\n");
+    fprintf(psuOutFile,"\n=-=-= TMATS Channel Summary =-=-=\n\n");
 
     // G record
     fprintf(psuOutFile,"Program Name - %s\n",psuTmatsInfo->psuFirstGRecord->szProgramName);
@@ -609,13 +609,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
             do  {
                 if (psuRDataSource == NULL) 
                     break;
-                if (strcasecmp(psuRDataSource->szChannelDataType,"429IN") == 0)
-                    {
+//                if (strcasecmp(psuRDataSource->szChannelDataType,"429IN") == 0)
+//                    {
                     iRDsiIndex = psuRDataSource->iDataSourceNum;
                     fprintf(psuOutFile," %5i ",   psuRDataSource->iTrackNumber);
                     fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                     fprintf(psuOutFile,"\n");
-                    }
+//                    }
                 psuRDataSource = psuRDataSource->psuNextRDataSource;
                 } while (bTRUE);
 
