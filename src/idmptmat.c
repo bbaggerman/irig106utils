@@ -54,8 +54,8 @@
  * ----------------------
  */
 
-#define MAJOR_VERSION  "B1"
-#define MINOR_VERSION  "02"
+#define MAJOR_VERSION  "01"
+#define MINOR_VERSION  "03"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -77,6 +77,7 @@
 void    vDumpRaw(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile);
 void    vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile);
 void    vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile);
+void    vDumpSig(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile);
 void    vUsage(void);
 
 
@@ -85,13 +86,14 @@ void    vUsage(void);
 int main(int argc, char ** argv)
     {
 
-    char                    szInFile[80];     // Input file name
-    char                    szOutFile[80];    // Output file name
+    char                    szInFile[1000];     // Input file name
+    char                    szOutFile[1000];    // Output file name
     int                     iArgIdx;
     FILE                  * psuOutFile;        // Output file handle
     int                     bRawOutput;
     int                     bTreeOutput;
     int                     bChannelOutput;
+    int                     bSigOutput;
     unsigned long           ulBuffSize = 0L;
 
     int                     iI106Ch10Handle;
@@ -118,6 +120,7 @@ int main(int argc, char ** argv)
     bRawOutput     = bFALSE;    // No verbosity
     bTreeOutput    = bFALSE;
     bChannelOutput = bFALSE;
+    bSigOutput     = bFALSE;
     szInFile[0]    = '\0';
     strcpy(szOutFile,"");       // Default is stdout
 
@@ -144,6 +147,10 @@ int main(int argc, char ** argv)
                         bChannelOutput = bTRUE;
                         break;
 
+                    case 's' :                   // Signature
+                        bSigOutput = bTRUE;
+                        break;
+
                     default :
                         break;
                     } // end flag switch
@@ -167,7 +174,8 @@ int main(int argc, char ** argv)
     // Make sure at least on output is turned on
     if ((bRawOutput     == bFALSE) &&
         (bTreeOutput    == bFALSE) &&
-        (bChannelOutput == bFALSE))
+        (bChannelOutput == bFALSE) &&
+        (bSigOutput     == bFALSE))
         bChannelOutput = bTRUE;
 
 /*
@@ -261,6 +269,9 @@ int main(int argc, char ** argv)
 
     if (bChannelOutput == bTRUE)
         vDumpChannel(&suI106Hdr, pvBuff, psuOutFile);
+
+    if (bSigOutput == bTRUE)
+        vDumpSig(&suI106Hdr, pvBuff, psuOutFile);
 
     // Done so clean up
     free(pvBuff);
@@ -437,15 +448,56 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFil
 
 /* ------------------------------------------------------------------------ */
 
+void    vDumpSig(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile)
+    {
+    EnI106Status            enStatus;
+    SuTmatsInfo             suTmatsInfo;
+    uint8_t                 iOpCode;
+    uint32_t                iSignature;
+
+    // Process the TMATS info
+    memset( &suTmatsInfo, 0, sizeof(suTmatsInfo) );
+    enStatus = enI106_Decode_Tmats(psuI106Hdr, pvBuff, &suTmatsInfo);
+    if (enStatus != I106_OK) 
+        {
+        fprintf(stderr, " Error processing TMATS record : Status = %d\n", enStatus);
+        return;
+        }
+
+    enStatus = enI106_Tmats_Signature(&((char *)pvBuff)[4], psuI106Hdr->ulDataLen-4, TMATS_SIGVER_DEFAULT, TMATS_SIGFLAG_NONE, &iOpCode, &iSignature);
+    if (enStatus != I106_OK) 
+        {
+        fprintf(stderr, " Error processing TMATS signature : Status = %d\n", enStatus);
+        return;
+        }
+
+
+    // Print out the TMATS info
+    // ------------------------
+
+    // G record
+    fprintf(psuOutFile, "(G) Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
+    fprintf(psuOutFile, "(G) IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
+    fprintf(psuOutFile, "\n");
+    fprintf(psuOutFile, "%2.2X-%8.8X (OpCode-Signature in hex)\n", iOpCode, iSignature);
+
+    return;
+    }
+
+
+
+/* ------------------------------------------------------------------------ */
+
 void vUsage(void)
     {
     printf("\nIDMPTMAT - IDMPTMAT "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Read and output TMATS record from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
+    printf("Freeware Copyright (C) 2011 Irig106.org\n\n");
     printf("Usage: idmptmat <infile> <outfile> <flags>\n");
     printf("  -c      Output channel summary format (default)\n");
     printf("  -t      Output tree view format\n");
     printf("  -r      Output raw TMATS\n");
+    printf("  -s      Output TMATS signature\n");
     return;
     }
 
