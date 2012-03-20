@@ -452,7 +452,7 @@ void    vDumpSig(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile
     {
     EnI106Status            enStatus;
     SuTmatsInfo             suTmatsInfo;
-    uint8_t                 iOpCode;
+    uint16_t                iOpCode;
     uint32_t                iSignature;
 
     // Process the TMATS info
@@ -477,9 +477,7 @@ void    vDumpSig(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile
 
     // G record
     fprintf(psuOutFile, "(G) Program Name - %s\n",suTmatsInfo.psuFirstGRecord->szProgramName);
-    fprintf(psuOutFile, "(G) IRIG 106 Rev - %s\n",suTmatsInfo.psuFirstGRecord->szIrig106Rev);
-    fprintf(psuOutFile, "\n");
-    fprintf(psuOutFile, "%2.2X-%8.8X (OpCode-Signature in hex)\n", iOpCode, iSignature);
+    fprintf(psuOutFile, "%2.2X-%8.8X\n", iOpCode, iSignature);
 
     return;
     }
