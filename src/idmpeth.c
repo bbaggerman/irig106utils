@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -90,7 +90,7 @@ FILE        * m_psuOutFile;        // Output file handle
  * -------------------
  */
 
-void PrintEthernetFrame(SuEthernetF0_CurrMsg * suEthMsg);
+void PrintEthernetFrame(SuEthernetF0_Header * psuEthHdr, SuEthernetF0_CurrMsg * psuEthMsg);
 void vPrintTmats(SuTmatsInfo * psuTmatsInfo);
 void vUsage(void);
 
@@ -107,7 +107,7 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     char                  * szTime;
 //    int                     iWordIdx;
-    int                     iMilliSec;
+//    int                     iMilliSec;
     int                     iChannel;         // Channel number
 //    int                     iRTAddr;          // RT address
 //    int                     iTR;              // Transmit bit
@@ -386,7 +386,7 @@ int main(int argc, char ** argv)
 
                     if ((suEthMsg.psuChanSpec->uFormat       == I106_ENET_FMT_PHYSICAL   ) &&
                         (suEthMsg.psuEthernetF0Hdr->uContent == I106_ENET_CONTENT_FULLMAC))
-                        PrintEthernetFrame(&suEthMsg);
+                        PrintEthernetFrame(suEthMsg.psuEthernetF0Hdr, &suEthMsg);
                     else
                         fprintf(m_psuOutFile, "Unknown ethernet frame type\n");
 
@@ -432,10 +432,12 @@ int main(int argc, char ** argv)
 
 /* ------------------------------------------------------------------------ */
 
-void PrintEthernetFrame(SuEthernetF0_CurrMsg * psuEthMsg)
+void PrintEthernetFrame(SuEthernetF0_Header * psuEthHdr, SuEthernetF0_CurrMsg * psuEthMsg)
     {
     SuEthernetF0_Physical_FullMAC   * psuEthData = (SuEthernetF0_Physical_FullMAC *)psuEthMsg->pauData;
-
+    int     iDataLen;
+    int     iDataIdx;
+    
     // Byte swap the type / length field
     psuEthData->uTypeLen = (0xff00 & (psuEthData->uTypeLen << 8)) |
                            (0x00ff & (psuEthData->uTypeLen >> 8));
@@ -472,6 +474,13 @@ void PrintEthernetFrame(SuEthernetF0_CurrMsg * psuEthMsg)
                 fprintf(m_psuOutFile, " 802.3 ");
             break;
         } // end switch on type / length
+        
+    // Data
+    iDataLen = psuEthHdr->uDataLen - 14;
+    for (iDataIdx=0; iDataIdx<iDataLen; iDataIdx++)
+        {
+        fprintf(m_psuOutFile, " %2.2x", psuEthData->abyData[iDataIdx]);
+        }
 
     fprintf(m_psuOutFile, "\n");
 
