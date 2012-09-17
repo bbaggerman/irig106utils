@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -106,7 +106,7 @@ int main(int argc, char ** argv)
     FILE                  * psuOutFile;        // Output file handle
     char                  * szTime;
     int                     iWordIdx;
-    int                     iMilliSec;
+    int                     iMicroSec;
     int                     iChannel;         // Channel number
     int                     iRTAddr;          // RT address
     int                     iTR;              // Transmit bit
@@ -443,8 +443,8 @@ int main(int argc, char ** argv)
                                 su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
                             szTime = ctime((time_t *)&suTime.ulSecs);
 							szTime[19] = '\0';
-							iMilliSec = (int)(suTime.ulFrac / 10000.0);
-                            fprintf(psuOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
+							iMicroSec = (int)(suTime.ulFrac / 10.0);
+                            fprintf(psuOutFile,"%s.%6.6d", &szTime[11], iMicroSec);
 
                             // Print out the command word
                             fprintf(psuOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
