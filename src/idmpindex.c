@@ -58,7 +58,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -210,6 +210,7 @@ int main(int argc, char ** argv)
             fprintf(stderr, "Warning opening data file : Status = %d\n", enStatus);
             break;
         case I106_OK :
+            if (bVerbose) printf("Open file OK\n");
             break;
         default :
             fprintf(stderr, "Error opening data file : Status = %d\n", enStatus);
@@ -223,6 +224,8 @@ int main(int argc, char ** argv)
         fprintf(stderr, "Error establishing time sync : Status = %d\n", enStatus);
         return 1;
         }
+    else
+        if (bVerbose) printf("Sync to file time OK\n");
 
 
 /*
@@ -307,6 +310,8 @@ int main(int argc, char ** argv)
         return 1;
         }
 
+    if (bVerbose) printf("Moved to last packet\n");
+
     // Read what should be a root index packet
     enStatus = enI106Ch10GetPos(m_iI106Handle, &llCurrRootOffset);
     enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
@@ -323,6 +328,8 @@ int main(int argc, char ** argv)
         return 1;
         }
 
+    if (bVerbose) printf("Root index packet found in last packet\n");
+
     // Check index linkage
     // -------------------
 
@@ -330,7 +337,7 @@ int main(int argc, char ** argv)
     while (1==1) 
         {
 
-        // Read the index packet
+        // Read the root index packet
         // Make sure our buffer is big enough, size *does* matter
         if (ulRootBuffSize < suI106Hdr.ulPacketLen)
             {
@@ -344,9 +351,11 @@ int main(int argc, char ** argv)
         // Check for data read errors
         if (enStatus != I106_OK)
             {
-            printf ("ERROR %d - Can't read data\n", enStatus);
+            printf ("ERROR %d - Can't read root index packet %d data\n", enStatus, iRootIndexPackets);
             break;
             }
+        else
+            if (bVerbose) printf("Read root index packet %d\n", iRootIndexPackets);
 
         iRootIndexPackets++;
 
@@ -362,7 +371,7 @@ int main(int argc, char ** argv)
                 enStatus = enI106Ch10SetPos(m_iI106Handle, *(suCurrRootIndexMsg.plFileOffset));
                 if (enStatus != I106_OK)
                     {
-                    printf ("ERROR %d - Can't set file position\n", enStatus);
+                    printf ("ERROR %d - Can't set file position to next index position from root packet\n", enStatus);
                     break;
                     }
 
@@ -394,9 +403,11 @@ int main(int argc, char ** argv)
                 // Check for data read errors
                 if (enStatus != I106_OK)
                     {
-                    printf ("ERROR %d - Can't read data\n", enStatus);
+                    printf ("ERROR %d - Can't read node index packet data\n", enStatus);
                     break;
                     }
+
+                if (bVerbose) printf("Read node index packet %d from root index packet %d\n", iNodeIndexPackets, iRootIndexPackets);
 
                 iNodeIndexPackets++;
 
@@ -415,7 +426,7 @@ int main(int argc, char ** argv)
                         enStatus = enI106Ch10SetPos(m_iI106Handle, *(suCurrNodeIndexMsg.plFileOffset));
                         if (enStatus != I106_OK)
                             {
-                            printf ("ERROR %d - Can't set file position\n", enStatus);
+                            printf ("ERROR %d - Can't set file position from node index\n", enStatus);
                             break;
                             }
 
@@ -504,7 +515,7 @@ int main(int argc, char ** argv)
         enStatus = enI106Ch10SetPos(m_iI106Handle, llNextRootOffset);
         if (enStatus != I106_OK)
             {
-            printf ("ERROR %d - Can't set file position\n", enStatus);
+            printf ("ERROR %d - Can't set file position to next root packet\n", enStatus);
             break;
             }
 
@@ -512,13 +523,13 @@ int main(int argc, char ** argv)
         enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
         if (enStatus != I106_OK)
             {
-            printf ("ERROR %d - Can't read header\n", enStatus);
+            printf ("ERROR %d - Can't read root packet header\n", enStatus);
             break;
             }
 
         if (suI106Hdr.ubyDataType != I106CH10_DTYPE_RECORDING_INDEX)
             {
-            printf ("ERROR - Root index packet not found\n");
+            printf ("ERROR - Next root index packet not found\n");
             break;
             }
 
