@@ -104,7 +104,7 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     FILE                  * psuOutFile;        // Output file handle
     char                  * szTime;
-    int                     iMilliSec;
+//    int                     iMilliSec;
     int                     iChannel;         // Channel number
     int                     iBus;             // 429 bus number
     unsigned long           lMsgs = 0;        // Total message
