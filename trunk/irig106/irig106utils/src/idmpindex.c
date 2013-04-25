@@ -102,12 +102,13 @@ int main(int argc, char ** argv)
     char                    szOutFile[256];    // Output file name
     int                     iArgIdx;
     FILE                  * psuOutFile;        // Output file handle
-//    char                  * szTime;
     unsigned long           lMsgs = 0;        // Total message
     unsigned long           lRootMsgs = 0;
     unsigned long           lNodeMsgs = 0;
     int                     bVerbose;
-    int                     bDecimal;         // Hex/decimal flag
+	int						bPrintTime;
+	int						bPrintEvents;
+	int                     bDecimal;         // Hex/decimal flag
     int                     bPrintTMATS;
 
     EnI106Status            enStatus;
@@ -117,8 +118,6 @@ int main(int argc, char ** argv)
     unsigned char         * pvRootBuff  = NULL;
     unsigned long           ulNodeBuffSize = 0L;
     unsigned char         * pvNodeBuff  = NULL;
-
-//    SuIrig106Time           suTime;
 
 	SuIndex_CurrMsg         suCurrRootIndexMsg;
 	SuIndex_CurrMsg         suCurrNodeIndexMsg;
@@ -143,7 +142,9 @@ int main(int argc, char ** argv)
         return 1;
         }
 
-    bVerbose        = bFALSE;            /* No verbosity                      */
+	bPrintTime		= bFALSE;
+	bPrintEvents	= bFALSE;
+	bVerbose        = bFALSE;            /* No verbosity                      */
     bDecimal        = bFALSE;
     bPrintTMATS     = bFALSE;
 
@@ -159,6 +160,14 @@ int main(int argc, char ** argv)
             case '-' :
                 switch (argv[iArgIdx][1]) 
                     {
+
+                    case 't' :                   /* Print time packets */
+                        bPrintTime = bTRUE;
+                        break;
+
+                    case 'e' :                   /* Print event packets */
+                        bPrintEvents = bTRUE;
+                        break;
 
                     case 'v' :                   /* Verbose switch */
                         bVerbose = bTRUE;
@@ -193,7 +202,7 @@ int main(int argc, char ** argv)
  */
 
     fprintf(stderr, "\nIDMPINDEX "MAJOR_VERSION"."MINOR_VERSION"\n");
-    fprintf(stderr, "Freeware Copyright (C) 2010 Irig106.org\n\n");
+    fprintf(stderr, "Freeware Copyright (C) 2013 Irig106.org\n\n");
 
 	putenv("TZ=GMT0");
 	tzset();
@@ -407,7 +416,7 @@ int main(int argc, char ** argv)
                     break;
                     }
 
-                if (bVerbose) printf("Read node index packet %d from root index packet %d\n", iNodeIndexPackets, iRootIndexPackets);
+//                if (bVerbose) printf("Read node index packet %d from root index packet %d\n", iNodeIndexPackets, iRootIndexPackets);
 
                 iNodeIndexPackets++;
 
@@ -437,6 +446,32 @@ int main(int argc, char ** argv)
                             printf ("ERROR %d - Can't read indexed packet header\n", enStatus);
                             return 1;
                             }
+
+						// Print out time and event packets
+						switch ((suCurrNodeIndexMsg.psuNodeData)->uDataType)
+						{
+						case I106CH10_DTYPE_IRIG_TIME :
+							if ((bVerbose == bTRUE) || (bPrintTime == bTRUE))
+								printf("Ch S%2u  TIME      Offset %-14llu\n", 
+									(suCurrNodeIndexMsg.psuNodeData)->uChannelID, 
+									*(suCurrNodeIndexMsg.plFileOffset));
+							break;
+
+						case I106CH10_DTYPE_RECORDING_EVENT :
+							if ((bVerbose == bTRUE) || (bPrintEvents == bTRUE))
+								printf("Ch S%2u  EVENT     Offset %-14llu\n", 
+									(suCurrNodeIndexMsg.psuNodeData)->uChannelID, 
+									*(suCurrNodeIndexMsg.plFileOffset));
+							break;
+
+						default :
+							if (bVerbose == bTRUE)
+								printf("Ch S%2u  Type 0x%2.2x Offset %-14llu\n", 
+									(suCurrNodeIndexMsg.psuNodeData)->uChannelID, 
+									(suCurrNodeIndexMsg.psuNodeData)->uDataType,
+									*(suCurrNodeIndexMsg.plFileOffset));
+							break;
+						} // end switch on data type
 
                         if (suI106Hdr.ubyDataType != (suCurrNodeIndexMsg.psuNodeData)->uDataType)
                             {
@@ -647,49 +682,14 @@ void vUsage(void)
     {
     printf("\nIDMPINDEX "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Dump index data from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
+    printf("Freeware Copyright (C) 2013 Irig106.org\n\n");
     printf("Usage: idmpindex <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
-    printf("                                             \n");
-    printf("The output data fields are:                  \n");
-    printf("Time  ChanID  BusNum  Label  SDI  Data  SSM  \n");
+    printf("   -v               Verbose                                  \n");
+    printf("   -t               Print indexed time packets               \n");
+    printf("   -e               Print indexed event packets              \n");
+    printf("   -T               Print TMATS summary and exit             \n");
     }
 
 
 
-#if 0
-EnI106Status ProcessRootPacket()
-    {
-    EnI106Status            enStatus;
-
-    // Decode the first index message
-    enStatus = enI106_Decode_FirstIndex(&suI106Hdr, pvBuff, &suCurrIndexMsg);
-
-    // Step through the index messages
-    while (1==1)
-        {
-        switch (enStatus)
-            {
-            case I106_INDEX_ROOT :
-                break;
-
-            case I106_INDEX_ROOT_LINK :
-                break;
-
-            case I106_INDEX_NODE :
-                break;
-
-            case I106_NO_MORE_DATA :
-                break;
-
-           default :
-                break;
-            } // end switch on decode status
-
-        enStatus = enI106_Decode_NextIndex(&suCurrIndexMsg);
-        } // end while looping on index messages
-
-    return;
-    }
-
-#endif
