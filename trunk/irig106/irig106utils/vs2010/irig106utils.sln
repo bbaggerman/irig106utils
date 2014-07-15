@@ -63,6 +63,16 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "idmpindex", "idmpindex.vcxp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "irig106lib", "irig106lib.vcxproj", "{58DDF7B8-678D-4F59-BA89-DBD4724FE957}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "idmppcm", "idmppcm.vcxproj", "{A4609089-A6C9-42E0-8D06-4265A0A17ABA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{58DDF7B8-678D-4F59-BA89-DBD4724FE957} = {58DDF7B8-678D-4F59-BA89-DBD4724FE957}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "idmpcan", "idmpcan.vcxproj", "{AFC04954-1287-40B1-B950-216CD19D947C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{58DDF7B8-678D-4F59-BA89-DBD4724FE957} = {58DDF7B8-678D-4F59-BA89-DBD4724FE957}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -121,6 +131,14 @@ Global
 		{58DDF7B8-678D-4F59-BA89-DBD4724FE957}.Debug|Win32.Build.0 = Debug|Win32
 		{58DDF7B8-678D-4F59-BA89-DBD4724FE957}.Release|Win32.ActiveCfg = Release|Win32
 		{58DDF7B8-678D-4F59-BA89-DBD4724FE957}.Release|Win32.Build.0 = Release|Win32
+		{A4609089-A6C9-42E0-8D06-4265A0A17ABA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A4609089-A6C9-42E0-8D06-4265A0A17ABA}.Debug|Win32.Build.0 = Debug|Win32
+		{A4609089-A6C9-42E0-8D06-4265A0A17ABA}.Release|Win32.ActiveCfg = Release|Win32
+		{A4609089-A6C9-42E0-8D06-4265A0A17ABA}.Release|Win32.Build.0 = Release|Win32
+		{AFC04954-1287-40B1-B950-216CD19D947C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AFC04954-1287-40B1-B950-216CD19D947C}.Debug|Win32.Build.0 = Debug|Win32
+		{AFC04954-1287-40B1-B950-216CD19D947C}.Release|Win32.ActiveCfg = Release|Win32
+		{AFC04954-1287-40B1-B950-216CD19D947C}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
