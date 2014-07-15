@@ -87,9 +87,11 @@
   <ItemGroup>
     <ClCompile Include="..\..\irig106lib\src\i106_decode_1553f1.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_arinc429.c" />
+    <ClCompile Include="..\..\irig106lib\src\i106_decode_can.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_discrete.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_ethernet.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_index.c" />
+    <ClCompile Include="..\..\irig106lib\src\i106_decode_pcmf1.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_time.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_uart.c" />
@@ -104,6 +106,7 @@
     <ClInclude Include="..\..\irig106lib\src\i106_decode_1553f1.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_analog.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_arinc429.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_decode_can.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_comp_gen_0.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_discrete.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_ethernet.h" />
@@ -112,7 +115,7 @@
     <ClInclude Include="..\..\irig106lib\src\i106_decode_index.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_message.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_parallel.h" />
-    <ClInclude Include="..\..\irig106lib\src\i106_decode_pcm.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_decode_pcmf1.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_time.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_uart.h" />
