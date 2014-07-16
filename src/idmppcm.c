@@ -71,6 +71,11 @@ extern "C" {
 #define MAJOR_VERSION  "01"
 #define MINOR_VERSION  "01"
 
+#if defined(__GNUC__)
+#define _MAX_PATH    4096
+#define _snprintf    snprintf
+#endif
+
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
 #define bFALSE  (1==0)
