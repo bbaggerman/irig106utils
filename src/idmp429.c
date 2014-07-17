@@ -506,7 +506,7 @@ unsigned char ReverseLabel(unsigned char uLabel)
 
 void vUsage(void)
     {
-    printf("\nIDMPA429 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("\nIDMP429 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Dump ARINC 429 records from a Ch 10 data file\n");
     printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
     printf("Usage: idmpa429 <input file> <output file> [flags]\n");
