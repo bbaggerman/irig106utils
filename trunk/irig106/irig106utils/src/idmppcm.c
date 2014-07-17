@@ -699,7 +699,7 @@ int PostProcessFrame_PcmF1(SuPcmF1_CurrMsg * psuCurrMsg)
 
 void vUsage(void)
     {
-    printf("\nIDMPA429 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("\nIDMPPCM "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Dump PCMF1 records from a Ch 10 data file\n");
     printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
     printf("Usage: idmppcm <input file> <output file> [flags]\n");
