@@ -3,17 +3,20 @@
 # ---------------------------------------------------------------------------
 
 SRC_DIR=../src
-CFLAGS=-iquote../../irig106lib/src -ggdb -fpack-struct=1
+CFLAGS=-DIRIG_NETWORKING -iquote../../irig106lib/src -ggdb -fpack-struct=1
 LIBS=../../irig106lib/gcc/libirig106.a
 
 #all: i106stat i106trim i106vid idmptmat idmp1553 idmpins idmpuart idmpeth idmp429 idmpindex idmptime idmpgps
-all: i106stat i106vid idmptmat idmp1553 idmpins idmpuart idmpeth idmp429 idmpindex idmptime idmpgps idmpcan idmppcm idmpanalog
+all: i106stat i106vid i106udprcv idmptmat idmp1553 idmpins idmpuart idmpeth idmp429 idmpindex idmptime idmpgps idmpcan idmppcm idmpanalog
 
 i106stat: $(SRC_DIR)/i106stat.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -o $@
 
 i106trim: $(SRC_DIR)/i106trim.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -o $@
+
+i106udprcv: $(SRC_DIR)/i106udprcv.c $(LIBS)
+	cc $(CFLAGS) $< $(LIBS) -lm -o $@
 
 idmptmat: $(SRC_DIR)/idmptmat.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -o $@
@@ -53,5 +56,6 @@ idmppcm: $(SRC_DIR)/idmppcm.c $(LIBS)
 
 idmpanalog: $(SRC_DIR)/idmpanalog.c $(LIBS)
 	cc $(CFLAGS) $< $(LIBS) -lm -o $@
+
 clean:
 	rm i106stat i106vid idmptmat idmp1553 idmpins idmpuart idmpeth idmp429 idmpindex idmptime idmpgps idmpcan idmppcm idmpanalog
