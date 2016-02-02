@@ -53,7 +53,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions);_USE_32BIT_TIME_T</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_USE_32BIT_TIME_T;IRIG_NETWORKING;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
@@ -70,7 +70,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions);_USE_32BIT_TIME_T</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_USE_32BIT_TIME_T;IRIG_NETWORKING;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
@@ -85,6 +85,7 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\irig106lib\src\i106_data_stream.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_1553f1.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_arinc429.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_can.c" />
@@ -102,6 +103,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\irig106lib\src\config.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_data_stream.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_1394.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_1553f1.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_analog.h" />
