@@ -73,6 +73,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "idmpcan", "idmpcan.vcxproj"
 		{58DDF7B8-678D-4F59-BA89-DBD4724FE957} = {58DDF7B8-678D-4F59-BA89-DBD4724FE957}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "i106udprcv", "i106udprcv.vcxproj", "{65B0A165-0946-4C65-8498-3215AB99D57E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -139,6 +141,10 @@ Global
 		{AFC04954-1287-40B1-B950-216CD19D947C}.Debug|Win32.Build.0 = Debug|Win32
 		{AFC04954-1287-40B1-B950-216CD19D947C}.Release|Win32.ActiveCfg = Release|Win32
 		{AFC04954-1287-40B1-B950-216CD19D947C}.Release|Win32.Build.0 = Release|Win32
+		{65B0A165-0946-4C65-8498-3215AB99D57E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{65B0A165-0946-4C65-8498-3215AB99D57E}.Debug|Win32.Build.0 = Debug|Win32
+		{65B0A165-0946-4C65-8498-3215AB99D57E}.Release|Win32.ActiveCfg = Release|Win32
+		{65B0A165-0946-4C65-8498-3215AB99D57E}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
