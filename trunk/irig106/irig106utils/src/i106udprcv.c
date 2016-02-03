@@ -47,16 +47,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+// Stuff for _kbhit()
+#if defined(_WIN32)
+#include <conio.h>
+#endif
+#if defined(__GNUC__)
+#include <stropts.h>
+#include <termios.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <sys/select.h>
+#endif
+
+// IRIG library
 #include "stdint.h"
 #include "config.h"
 #include "irig106ch10.h"
 #include "i106_time.h"
 #include "i106_decode_time.h"
 
-/*
- * Macros and definitions
- * ----------------------
- */
+// Macros and definitions
+// ----------------------
 
 #define MAJOR_VERSION  "01"
 #define MINOR_VERSION  "00"
@@ -66,38 +77,34 @@
 #define bFALSE  (1==0)
 #endif
 
-/*
- * Data structures
- * ---------------
- */
+
+// Data structures
+// ---------------
 
 
-/*
- * Module data
- * -----------
- */
+
+// Module data
+// -----------
 
 void          * m_pvBuff     = NULL;
 unsigned long   m_ulBuffSize = 0L;
 
-/*
- * Function prototypes
- * -------------------
- */
+// Function prototypes
+// -------------------
 
-// void vStats(char *szFileName);
-int64_t GetCh10FileSize(char * szFilename);
 void    vUsage(void);
-//time_t  mkgmtime(struct tm * tm);
 
-
+#if defined(__GNUC__)
+int _kbhit();
+#endif
 
 /* ======================================================================== */
 
 int main (int argc, char *argv[])
     {
-    char              * szOutFile;
-    int                 iI106_In;   // Input data handle
+    char              * szOutFile = NULL;
+    int                 iI106_In;   // Input data stream handle
+    int                 iI106_Out;  // Output data file handle
     uint16_t            uPort;      // UDP receive port
 
     EnI106Status        enStatus;
@@ -119,13 +126,11 @@ int main (int argc, char *argv[])
 
     int                 bHaveTmats = bTRUE;
     int                 bHaveTime  = bTRUE;
+    int                 bWriteFile = bFALSE;
 
-//    int                 iStatus;
 
-
-/*
- * Process the command line arguments
- */
+// Process the command line arguments
+// ----------------------------------
 
     if (argc < 2) 
         {
@@ -177,19 +182,18 @@ int main (int argc, char *argv[])
 
         } // end for all arguments
 
-/*
- * Opening banner
- * --------------
- */
+// Get setup to run
+// ----------------
+
+// Opening banner
 
     fprintf(stderr, "\nI106UDPRCV "MAJOR_VERSION"."MINOR_VERSION"\n");
     fprintf(stderr, "Freeware Copyright (C) 2015 Irig106.org\n\n");
+    fprintf(stderr, "Press any key to exit...\n");
 
-/*
- * Open the input UDPstream and get things setup
- */
+// Open the input UDPstream and get things setup
 
-    // Open the input data file
+    // Open the input data stream
     enStatus = enI106Ch10OpenStreamRead(&iI106_In, uPort);
     if (enStatus != I106_OK)
         {
@@ -197,23 +201,25 @@ int main (int argc, char *argv[])
         return 1;
         }
 
-/*
- * Open the output file
- */
-    //enStatus = enI106Ch10Open(&iI106_Out, argv[2], I106_OVERWRITE);
-    //if (enStatus != I106_OK)
-    //    {
-    //    fprintf(stderr, "Error opening output data file : Status = %d\n", enStatus);
-    //    return 1;
-    //    }
+// Open the output file
 
-/*
- * Read data packets until EOF
- */
+    if (szOutFile != NULL)
+        {
+        enStatus = enI106Ch10Open(&iI106_Out, szOutFile, I106_OVERWRITE);
+        if (enStatus != I106_OK)
+            {
+            fprintf(stderr, "Error opening output data file : Status = %d\n", enStatus);
+            return 1;
+            }
+        else
+            bWriteFile = bTRUE;
+        } // end if output file name not null
+
+// Read data packets until EOF
+// ---------------------------
 
     lMsgs = 1;
-
-    while (1==1) 
+    while (!_kbhit())
         {
 
         // Read the next header
@@ -229,6 +235,20 @@ int main (int argc, char *argv[])
             if (enStatus != I106_OK)
                 {
                 fprintf(stderr, "Error enI106Ch10ReadNextHeader() : %s\n", szI106ErrorStr(enStatus));
+                break;
+                }
+
+            // Get the data
+            if (ulBuffSize < suI106Hdr.ulPacketLen)
+                {
+                pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
+                ulBuffSize = suI106Hdr.ulPacketLen;
+                }
+
+            enStatus = enI106Ch10ReadData(iI106_In, ulBuffSize, pvBuff);
+            if (enStatus != I106_OK)
+                {
+                fprintf(stderr, "Error enI106Ch10ReadData() : %s\n", szI106ErrorStr(enStatus));
                 break;
                 }
 
@@ -248,15 +268,9 @@ int main (int argc, char *argv[])
                         pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
                         ulBuffSize = suI106Hdr.ulPacketLen;
                         }
-                    // Read the data buffer and decode time
-                    enStatus = enI106Ch10ReadData(iI106_In, ulBuffSize, pvBuff);
-                    if (enStatus != I106_OK)
-                        {
-                        fprintf(stderr, "Error enI106Ch10ReadData() : %s\n", szI106ErrorStr(enStatus));
-                        break;
-                        }
+                    // Decode time
                     enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
-                    printf("Data Type 0x%2.2x  Time\n", suI106Hdr.ubyDataType);
+                    printf("Data Type 0x%2.2x  Time %s\n", suI106Hdr.ubyDataType, IrigTime2String(&suTime));
                     break;
 
                 default :
@@ -264,6 +278,9 @@ int main (int argc, char *argv[])
                     break;
                 } // end switch on data type
 
+                // Write packet to Ch 10 file
+                if (bWriteFile && bHaveTmats && bHaveTime)
+                    enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
 
             } while (bFALSE); // end one time loop
 
@@ -274,19 +291,18 @@ int main (int argc, char *argv[])
             break;
             }
 
-        }   /* End while */
+        }   // End while forever
 
-/*
- * Print some stats, close the files, and get outa here
- */
+// Print some stats, close the files, and get outa here
+// ----------------------------------------------------
 
     printf("Packets Read %ld\n",lMsgs);
 
     enI106Ch10Close(iI106_In);
+    enI106Ch10Close(iI106_Out);
 
-
-  return 0;
-  }
+    return 0;
+    }
 
 
 
@@ -306,4 +322,31 @@ void vUsage(void)
     }
 
 
+// ----------------------------------------------------------------------------
 
+#if defined(__GNUC__)
+
+// Linux (POSIX) implementation of _kbhit()
+
+int _kbhit() 
+    {
+    static const int    STDIN = 0;
+    static int          initialized = 0;
+    int                 bytesWaiting;
+    struct termios      term;
+
+    if (initialized == 0) 
+        {
+        // Use termios to turn off line buffering
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initialized = 1;
+        }
+
+    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    return bytesWaiting;
+    }
+
+#endif
