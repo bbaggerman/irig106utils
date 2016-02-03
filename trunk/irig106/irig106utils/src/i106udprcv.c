@@ -236,7 +236,7 @@ int main (int argc, char *argv[])
             switch (suI106Hdr.ubyDataType)
                 {
                 case I106CH10_DTYPE_TMATS :
-                    bHaveTime = bTRUE;
+                    bHaveTmats = bTRUE;
                     printf("Data Type 0x%2.2x  TMATS\n", suI106Hdr.ubyDataType);
                     break;
 
@@ -250,6 +250,11 @@ int main (int argc, char *argv[])
                         }
                     // Read the data buffer and decode time
                     enStatus = enI106Ch10ReadData(iI106_In, ulBuffSize, pvBuff);
+                    if (enStatus != I106_OK)
+                        {
+                        fprintf(stderr, "Error enI106Ch10ReadData() : %s\n", szI106ErrorStr(enStatus));
+                        break;
+                        }
                     enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
                     printf("Data Type 0x%2.2x  Time\n", suI106Hdr.ubyDataType);
                     break;
