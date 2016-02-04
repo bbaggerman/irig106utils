@@ -105,25 +105,21 @@ int main (int argc, char *argv[])
     char              * szOutFile = NULL;
     int                 iI106_In;   // Input data stream handle
     int                 iI106_Out;  // Output data file handle
-    uint16_t            uPort;      // UDP receive port
+    unsigned int        uPort;      // UDP receive port
 
     EnI106Status        enStatus;
 
     SuI106Ch10Header    suI106Hdr;
     SuIrig106Time       suTime;
     unsigned long       ulBuffSize = 0;
-    void              * pvBuff = NULL;
+    void              * pvBuff     = NULL;
 
-//    SuI106Ch10Header    suTimeHdr;
-    void              * pvTimeBuff = NULL;
-    unsigned long       ulTimeBuffSize = 0;
-
-//    struct tm         * psuTmTime;
+//    void              * pvTimeBuff = NULL;
+//    unsigned long       ulTimeBuffSize = 0;
 
     int                 iArgIdx;
 
-    long                lMsgs = 0L;
-
+    long                lPackets;
     int                 bHaveTmats = bTRUE;
     int                 bHaveTime  = bTRUE;
     int                 bWriteFile = bFALSE;
@@ -131,7 +127,6 @@ int main (int argc, char *argv[])
 
 // Process the command line arguments
 // ----------------------------------
-
     if (argc < 2) 
         {
         vUsage();
@@ -141,7 +136,6 @@ int main (int argc, char *argv[])
     // Step through all the arguements
     for (iArgIdx=1; iArgIdx<argc; iArgIdx++) 
         {
-
         // Check the first character
         switch (argv[iArgIdx][0]) 
             {
@@ -159,6 +153,7 @@ int main (int argc, char *argv[])
                             vUsage();
                             return 1;
                             }
+                        break;
 
                     case 'T' :                   // Wait for TMATS flag
                         bHaveTmats = bFALSE;
@@ -179,7 +174,6 @@ int main (int argc, char *argv[])
                 break; // end any other first character
 
             } // end switch on first character
-
         } // end for all arguments
 
 // Get setup to run
@@ -189,7 +183,8 @@ int main (int argc, char *argv[])
 
     fprintf(stderr, "\nI106UDPRCV "MAJOR_VERSION"."MINOR_VERSION"\n");
     fprintf(stderr, "Freeware Copyright (C) 2015 Irig106.org\n\n");
-    fprintf(stderr, "Press any key to exit...\n");
+
+    fprintf(stderr, "Starting, press any key to exit...\n\n");
 
 // Open the input UDPstream and get things setup
 
@@ -215,10 +210,20 @@ int main (int argc, char *argv[])
             bWriteFile = bTRUE;
         } // end if output file name not null
 
+    if (bWriteFile)
+        {
+        fprintf(stderr, "Writing packets to file '%s'\n", szOutFile);
+        if (!bHaveTmats)
+            fprintf(stderr, "Wait for first TMATS packet\n");
+        if (!bHaveTime)
+            fprintf(stderr, "Wait for first Time packet\n");
+        fprintf(stderr, "\n");
+        }
+
 // Read data packets until EOF
 // ---------------------------
 
-    lMsgs = 1;
+    lPackets = 0L;
     while (!_kbhit())
         {
 
@@ -256,21 +261,50 @@ int main (int argc, char *argv[])
             switch (suI106Hdr.ubyDataType)
                 {
                 case I106CH10_DTYPE_TMATS :
-                    bHaveTmats = bTRUE;
+                    if (bHaveTmats == bFALSE)
+                        {
+                        bHaveTmats = bTRUE;
+                        printf("\nGot first TMATS packet\n");
+                        }
                     printf("Data Type 0x%2.2x  TMATS\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_IRIG_TIME :
-                    bHaveTime = bTRUE;
-                    // Make sure our buffer is big enough, size *does* matter
-                    if (ulBuffSize < suI106Hdr.ulPacketLen)
-                        {
-                        pvBuff = realloc(pvBuff, suI106Hdr.ulPacketLen);
-                        ulBuffSize = suI106Hdr.ulPacketLen;
-                        }
                     // Decode time
+                    if (bHaveTime == bFALSE)
+                        {
+                        bHaveTime = bTRUE;
+                        printf("\nGot first Time packet\n");
+                        }
                     enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
                     printf("Data Type 0x%2.2x  Time %s\n", suI106Hdr.ubyDataType, IrigTime2String(&suTime));
+                    break;
+
+                case I106CH10_DTYPE_PCM_FMT_0 :
+                case I106CH10_DTYPE_PCM_FMT_1 :
+                    printf("Data Type 0x%2.2x  PCM\n", suI106Hdr.ubyDataType);
+                    break;
+
+                case I106CH10_DTYPE_1553_FMT_1 :
+                    printf("Data Type 0x%2.2x  1553\n", suI106Hdr.ubyDataType);
+                    break;
+
+                case I106CH10_DTYPE_ANALOG :
+                    printf("Data Type 0x%2.2x  Analog\n", suI106Hdr.ubyDataType);
+                    break;
+
+                case I106CH10_DTYPE_VIDEO_FMT_0 :
+                case I106CH10_DTYPE_VIDEO_FMT_1 :
+                case I106CH10_DTYPE_VIDEO_FMT_2 :
+                    printf("Data Type 0x%2.2x  Video\n", suI106Hdr.ubyDataType);
+                    break;
+
+                case I106CH10_DTYPE_UART_FMT_0 :
+                    printf("Data Type 0x%2.2x  UART\n", suI106Hdr.ubyDataType);
+                    break;
+
+                case I106CH10_DTYPE_ETHERNET_FMT_0 :
+                    printf("Data Type 0x%2.2x  Ethernet\n", suI106Hdr.ubyDataType);
                     break;
 
                 default :
@@ -282,24 +316,21 @@ int main (int argc, char *argv[])
                 if (bWriteFile && bHaveTmats && bHaveTime)
                     enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
 
+                lPackets++;
+
             } while (bFALSE); // end one time loop
 
-        // If EOF break out of main read loop
-        if (enStatus == I106_EOF)
-            {
-            fprintf(stderr, "End of file\n");
-            break;
-            }
-
-        }   // End while forever
+        }   // End while waiting for keypress
 
 // Print some stats, close the files, and get outa here
 // ----------------------------------------------------
 
-    printf("Packets Read %ld\n",lMsgs);
+    printf("Packets Read %ld\n",lPackets);
 
     enI106Ch10Close(iI106_In);
-    enI106Ch10Close(iI106_Out);
+
+    if (bWriteFile)
+        enI106Ch10Close(iI106_Out);
 
     return 0;
     }
