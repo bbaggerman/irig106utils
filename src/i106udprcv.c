@@ -89,6 +89,25 @@
 void          * m_pvBuff     = NULL;
 unsigned long   m_ulBuffSize = 0L;
 
+char * aszPacketType[] = {
+    "User Defined", "TMATS",        "Event",        "Index",        "Computer 4",   "Computer 5",   "Computer 6",   "Computer 7",
+    "PCM Fmt 0",    "PCM Fmt 1",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UNDEFINED",    "Time",         "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UNDEFINED",    "1553 Fmt 1",   "16PP194",      "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UNDEFINED",    "Analog",       "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UNDEFINED",    "Discrete",     "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "Message",      "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "ARINC 429",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "Video Fmt 0",  "Video Fmt 1",  "Video Fmt 2",  "Video Fmt 3",  "Video Fmt 4",  "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "Image Fmt 0",  "Image Fmt 1",  "Image Fmt 2",  "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UART Fmt 0",   "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "1394 Fmt 0",   "1394 Fmt 1",   "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "Parallel Fmt 0","UNDEFINED",   "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "Ethernet Fmt 0","Ethernet Fmt 2","UNDEFINED",  "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "TSPI Fmt 0",   "TSPI Fmt 1",   "TSPI Fmt 2",   "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "CAN",          "Fibre Channel Fmt 0","UNDEFINED","UNDEFINED",  "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+	"UNDEFINED" };
+
 // Function prototypes
 // -------------------
 
@@ -257,6 +276,10 @@ int main (int argc, char *argv[])
                 break;
                 }
 
+            // Print some general information
+            printf("Ch %2d %-20s (0x%2.2d)", suI106Hdr.uChID, 
+                aszPacketType[suI106Hdr.ubyDataType], suI106Hdr.ubyDataType);
+
             // Decode some selected message types
             switch (suI106Hdr.ubyDataType)
                 {
@@ -266,7 +289,7 @@ int main (int argc, char *argv[])
                         bHaveTmats = bTRUE;
                         printf("\nGot first TMATS packet\n");
                         }
-                    printf("Data Type 0x%2.2x  TMATS\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  TMATS\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_IRIG_TIME :
@@ -277,40 +300,43 @@ int main (int argc, char *argv[])
                         printf("\nGot first Time packet\n");
                         }
                     enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
-                    printf("Data Type 0x%2.2x  Time %s\n", suI106Hdr.ubyDataType, IrigTime2String(&suTime));
+                    enI106_SetRelTime(iI106_In, &suTime, suI106Hdr.aubyRefTime);
+
+                    printf(" %s", IrigTime2String(&suTime));
                     break;
 
                 case I106CH10_DTYPE_PCM_FMT_0 :
                 case I106CH10_DTYPE_PCM_FMT_1 :
-                    printf("Data Type 0x%2.2x  PCM\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  PCM\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_1553_FMT_1 :
-                    printf("Data Type 0x%2.2x  1553\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  1553\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_ANALOG :
-                    printf("Data Type 0x%2.2x  Analog\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  Analog\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_VIDEO_FMT_0 :
                 case I106CH10_DTYPE_VIDEO_FMT_1 :
                 case I106CH10_DTYPE_VIDEO_FMT_2 :
-                    printf("Data Type 0x%2.2x  Video\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  Video\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_UART_FMT_0 :
-                    printf("Data Type 0x%2.2x  UART\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  UART\n", suI106Hdr.ubyDataType);
                     break;
 
                 case I106CH10_DTYPE_ETHERNET_FMT_0 :
-                    printf("Data Type 0x%2.2x  Ethernet\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x  Ethernet\n", suI106Hdr.ubyDataType);
                     break;
 
                 default :
-                    printf("Data Type 0x%2.2x\n", suI106Hdr.ubyDataType);
+//                    printf("Data Type 0x%2.2x\n", suI106Hdr.ubyDataType);
                     break;
                 } // end switch on data type
+            printf("\n");
 
                 // Write packet to Ch 10 file
                 if (bWriteFile && bHaveTmats && bHaveTime)
