@@ -512,13 +512,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
         if (psuGDataSource == NULL) break;
 
         // G record data source info
-        iGIndex = psuGDataSource->iDataSourceNum;
+        iGIndex = psuGDataSource->iIndex;
 
         // R record info
         psuRRecord = psuGDataSource->psuRRecord;
         do  {
             if (psuRRecord == NULL) break;
-            iRIndex = psuRRecord->iRecordNum;
+            iRIndex = psuRRecord->iIndex;
 
             // R record data sources
             psuRDataSource = psuRRecord->psuFirstDataSource;
@@ -527,19 +527,19 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"PCMIN") == 0)
                     {
-                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(psuOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    iRDsiIndex = psuRDataSource->iIndex;
+                    fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
                     fprintf(psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                     fprintf(psuOutFile,"\n");
                     }
-                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                psuRDataSource = psuRDataSource->psuNext;
                 } while (bTRUE);
 
-            psuRRecord = psuRRecord->psuNextRRecord;
+            psuRRecord = psuRRecord->psuNext;
             } while (bTRUE);
 
 
-        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNext;
         } while (bTRUE);
 
     return;
@@ -609,7 +609,7 @@ EnI106Status AssembleAttributesFromTMATS(FILE *psuOutFile, SuTmatsInfo * psuTmat
             if(psuRDataSrc->szTrackNumber == NULL)
                 continue;
 
-            iTrackNumber = psuRDataSrc->iTrackNumber;
+            iTrackNumber = atoi(psuRDataSrc->szTrackNumber);
 
             if(iTrackNumber >= MaxSuChanInfo)
                 return(I106_BUFFER_TOO_SMALL);
@@ -627,7 +627,7 @@ EnI106Status AssembleAttributesFromTMATS(FILE *psuOutFile, SuTmatsInfo * psuTmat
 
                 // Now save channel type and name
                 apsuChanInfo[iTrackNumber]->uChID = iTrackNumber;
-                apsuChanInfo[iTrackNumber]->bEnabled = psuRDataSrc->bEnabled;
+                apsuChanInfo[iTrackNumber]->bEnabled = psuRDataSrc->szEnabled[0] == 'T';
                 apsuChanInfo[iTrackNumber]->psuRDataSrc = psuRDataSrc;
 
                 if (strcasecmp(psuRDataSrc->szChannelDataType,"PCMIN") == 0)
@@ -646,11 +646,11 @@ EnI106Status AssembleAttributesFromTMATS(FILE *psuOutFile, SuTmatsInfo * psuTmat
                 }
 
             // Get the next R record data source
-            psuRDataSrc = psuRDataSrc->psuNextRDataSource;
+            psuRDataSrc = psuRDataSrc->psuNext;
             } // end while walking R data source linked list
 
         // Get the next R record
-        psuRRecord = psuRRecord->psuNextRRecord;
+        psuRRecord = psuRRecord->psuNext;
 
         } // end while walking R record linked list
 

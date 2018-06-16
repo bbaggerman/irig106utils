@@ -518,13 +518,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo)
         if (psuGDataSource == NULL) break;
 
         // G record data source info
-        iGIndex = psuGDataSource->iDataSourceNum;
+        iGIndex = psuGDataSource->iIndex;
 
         // R record info
         psuRRecord = psuGDataSource->psuRRecord;
         do  {
             if (psuRRecord == NULL) break;
-            iRIndex = psuRRecord->iRecordNum;
+            iRIndex = psuRRecord->iIndex;
 
             // R record data sources
             psuRDataSource = psuRRecord->psuFirstDataSource;
@@ -533,19 +533,19 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
                     {
-                    iRDsiIndex = psuRDataSource->iDataSourceNum;
-                    fprintf(m_psuOutFile," %5i ",   psuRDataSource->iTrackNumber);
+                    iRDsiIndex = psuRDataSource->iIndex;
+                    fprintf(m_psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
                     fprintf(m_psuOutFile,"  %-20s", psuRDataSource->szDataSourceID);
                     fprintf(m_psuOutFile,"\n");
                     }
-                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                psuRDataSource = psuRDataSource->psuNext;
                 } while (bTRUE);
 
-            psuRRecord = psuRRecord->psuNextRRecord;
+            psuRRecord = psuRRecord->psuNext;
             } while (bTRUE);
 
 
-        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        psuGDataSource = psuTmatsInfo->psuFirstGRecord->psuFirstGDataSource->psuNext;
         } while (bTRUE);
 
     return;
