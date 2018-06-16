@@ -75,7 +75,7 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalDependencies>irig106.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>irig106.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(Configuration)\irig106lib\</AdditionalLibraryDirectories>
     </Link>
     <Bscmake>
@@ -112,7 +112,7 @@
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <TargetMachine>MachineX86</TargetMachine>
-      <AdditionalDependencies>irig106.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>irig106.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(Configuration)\irig106lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Bscmake>
