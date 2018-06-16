@@ -336,19 +336,19 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile)
         if (psuGDataSource == NULL) break;
 
         // G record data source info
-        iGIndex = psuGDataSource->iDataSourceNum;
+        iGIndex = psuGDataSource->iIndex;
         fprintf(psuOutFile, "  (G\\DSI-%i) Data Source ID   - %s\n",
-            psuGDataSource->iDataSourceNum,
+            psuGDataSource->iIndex,
             suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->szDataSourceID);
         fprintf(psuOutFile, "  (G\\DST-%i) Data Source Type - %s\n",
-            psuGDataSource->iDataSourceNum,
+            psuGDataSource->iIndex,
             suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->szDataSourceType);
 
         // R record info
         psuRRecord = psuGDataSource->psuRRecord;
         do  {
             if (psuRRecord == NULL) break;
-            iRIndex = psuRRecord->iRecordNum;
+            iRIndex = psuRRecord->iIndex;
             fprintf(psuOutFile, "    (R-%i\\ID) Data Source ID - %s\n",
                 iRIndex, psuRRecord->szDataSourceID);
 
@@ -356,18 +356,18 @@ void vDumpTree(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile)
             psuRDataSource = psuRRecord->psuFirstDataSource;
             do  {
                 if (psuRDataSource == NULL) break;
-                iRDsiIndex = psuRDataSource->iDataSourceNum;
+                iRDsiIndex = psuRDataSource->iIndex;
                 fprintf(psuOutFile, "      (R-%i\\DSI-%i) Data Source ID - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szDataSourceID);
                 fprintf(psuOutFile, "      (R-%i\\DST-%i) Channel Type   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szChannelDataType);
                 fprintf(psuOutFile, "      (R-%i\\TK1-%i) Track Number   - %s\n", iRIndex, iRDsiIndex, psuRDataSource->szTrackNumber);
-                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                psuRDataSource = psuRDataSource->psuNext;
                 } while (bTRUE);
 
-            psuRRecord = psuRRecord->psuNextRRecord;
+            psuRRecord = psuRRecord->psuNext;
             } while (bTRUE);
 
 
-        psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNext;
         } while (bTRUE);
 
 
@@ -413,32 +413,32 @@ void vDumpChannel(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFil
         if (psuGDataSource == NULL) break;
 
         // G record data source info
-        iGIndex = psuGDataSource->iDataSourceNum;
+        iGIndex = psuGDataSource->iIndex;
 
         // R record info
         psuRRecord = psuGDataSource->psuRRecord;
         do  {
             if (psuRRecord == NULL) break;
-            iRIndex = psuRRecord->iRecordNum;
+            iRIndex = psuRRecord->iIndex;
 
             // R record data sources
             psuRDataSource = psuRRecord->psuFirstDataSource;
             do  {
                 if (psuRDataSource == NULL) break;
-//                iRDsiIndex = psuRDataSource->iDataSourceNum;
+//                iRDsiIndex = psuRDataSource->iIndex;
                 fprintf(psuOutFile, " %5s ",   psuRDataSource->szTrackNumber);
                 fprintf(psuOutFile, "  %-12s", psuRDataSource->szChannelDataType);
-                fprintf(psuOutFile, "  %-8s",  psuRDataSource->bEnabled ? "Enabled" : "Disabled");
+                fprintf(psuOutFile, "  %-8s",  psuRDataSource->szEnabled[0]=='T' ? "Enabled" : "Disabled");
                 fprintf(psuOutFile, "  %-20s", psuRDataSource->szDataSourceID);
                 fprintf(psuOutFile, "\n");
-                psuRDataSource = psuRDataSource->psuNextRDataSource;
+                psuRDataSource = psuRDataSource->psuNext;
                 } while (bTRUE);
 
-            psuRRecord = psuRRecord->psuNextRRecord;
+            psuRRecord = psuRRecord->psuNext;
             } while (bTRUE);
 
 
-        psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNextGDataSource;
+        psuGDataSource = suTmatsInfo.psuFirstGRecord->psuFirstGDataSource->psuNext;
         } while (bTRUE);
 
     return;
