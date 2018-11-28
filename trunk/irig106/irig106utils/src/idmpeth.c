@@ -476,7 +476,7 @@ void PrintEthernetFrame(SuEthernetF0_Header * psuEthHdr, SuEthernetF0_CurrMsg * 
         } // end switch on type / length
         
     // Data
-    iDataLen = psuEthHdr->uDataLen - 14;
+    iDataLen = psuEthHdr->uMsgDataLen - 14;
     for (iDataIdx=0; iDataIdx<iDataLen; iDataIdx++)
         {
         fprintf(m_psuOutFile, " %2.2x", psuEthData->abyData[iDataIdx]);
