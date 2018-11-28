@@ -370,7 +370,7 @@ void vUsage(void)
     printf("\nI106UDPRCV "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Receive Ch 10 UDP data stream\n");
     printf("Freeware Copyright (C) 2015 Irig106.org\n\n");
-    printf("Usage: i106udprcv <-p port> [-T] [-t] [-m multi-cast address] <outfile>\n");
+    printf("Usage: i106udprcv <-p port> [-T] [-t] <outfile>\n");
     printf("  -p port   Receive UDP port number>\n");
     printf("  -T        Wait for TMATS packet before recording\n");
     printf("  -t        Wait for time packet before recording\n");
