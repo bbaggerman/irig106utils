@@ -106,18 +106,10 @@ int main(int argc, char ** argv)
     int                     iWordIdx;
     int                     iMicroSec;
     int                     iChannel;         // Channel number
-//    int                     iRTAddr;          // RT address
-//    int                     iTR;              // Transmit bit
-//    int                     iSubAddr;         // Subaddress
-//    unsigned                uDecimation;      // Decimation factor
-//    unsigned                uDecCnt;          // Decimation count
     unsigned long           lMsgs = 0;        // Total message
     unsigned long           l16PP194Msgs = 0;
     int                     bVerbose;
-//    int                     bDecimal;         // Hex/decimal flag
-//    int                     bStatusResponse;
     int                     bPrintTMATS;
-//    int                     bInOrder;         // Dump out in order
     unsigned long           ulBuffSize = 0L;
 
     EnI106Status            enStatus;
@@ -336,15 +328,6 @@ int main(int argc, char ** argv)
                 while (enStatus == I106_OK)
                     {
 
-#if 0
-                    // Check for matching parameters
-                    if (((iRTAddr  == -1) || (iRTAddr  == su16PP194Msg.psuCmdWord1->suStruct.uRTAddr )) &&
-                        ((iTR      == -1) || (iTR      == su16PP194Msg.psuCmdWord1->suStruct.bTR     )) &&
-                        ((iSubAddr == -1) || (iSubAddr == su16PP194Msg.psuCmdWord1->suStruct.uSubAddr)))
-                        {
-
-#endif
-
                         // Print out the time
                         // PROBABLY REALLY OUGHT TO CHECK FOR THAT GOOFY SECONDARY
                         // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
@@ -450,7 +433,6 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
                     break;
                 if (strcasecmp(psuRDataSource->szChannelDataType,"1553IN") == 0)
                     {
-//                    iRDsiIndex = psuRDataSource->iIndex;
                     fprintf(psuOutFile," %5s ",   psuRDataSource->szTrackNumber);
                     switch (atoi(psuRDataSource->su1553.szDataTypeFormat))
                         {
@@ -479,36 +461,13 @@ void vPrintTmats(SuTmatsInfo * psuTmatsInfo, FILE * psuOutFile)
 
 void vUsage(void)
     {
-    printf("\nIDMP1553 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
-    printf("Dump 1553 records from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2006 Irig106.org\n\n");
-    printf("Usage: idmp1553 <input file> <output file> [flags]\n");
+    printf("\nIDMP16PP194 "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
+    printf("Dump 16PP194 records from a Ch 10 data file\n");
+    printf("Freeware Copyright (C) 2018 Irig106.org\n\n");
+    printf("Usage: idmp16pp194 <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");
     printf("   -c ChNum   Channel Number (default all)   \n");
-    printf("   -r RT      RT Address(1-30) (default all) \n");
-    printf("   -t T/R     T/R Bit (0=R 1=T) (default all)\n");
-    printf("   -s SA      Subaddress (default all)       \n");
-    printf("   -d Num     Dump 1 in 'Num' messages       \n");
-    printf("   -i         Dump data as decimal integers  \n");
-    printf("   -u         Dump status response           \n");
-    printf("   -o         Dump in time order             \n");
-    printf("                                             \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
-    printf("The output data fields are:                  \n");
-    printf("  Time Bus RT T/R SA WC Errs Data...         \n");
-    printf("                                             \n");
-    printf("Error Bits:                                  \n");
-    printf("  0x01    Word Error                         \n");
-    printf("  0x02    Sync Error                         \n");
-    printf("  0x04    Word Count Error                   \n");
-    printf("  0x08    Response Timeout                   \n");
-    printf("  0x10    Format Error                       \n");
-    printf("  0x20    Message Error                      \n");
-    printf("  0x80    RT to RT                           \n");
     }
-
-
-
-
