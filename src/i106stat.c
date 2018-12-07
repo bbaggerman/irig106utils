@@ -60,7 +60,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "03"
+#define MINOR_VERSION  "04"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -114,6 +114,15 @@ typedef struct
     unsigned long       ulUART;
     unsigned long       ulEthernet;
     SuARINC429        * paARINC429;
+    unsigned long       ul16PP194;
+    unsigned long       ulDiscrete;
+    unsigned long       ulParallel;
+    unsigned long       ulMessage;
+    unsigned long       ulImage;
+    unsigned long       ulTSPI;
+    unsigned long       ulCAN;
+    unsigned long       ulFibreChan;
+    unsigned long       ulARINC664;
     unsigned long       ulOther;
     } SuChanInfo;
 
@@ -159,8 +168,8 @@ int main(int argc, char ** argv)
 
     FILE                  * psuOutFile;        // Output file handle
     int                     hI106In;
-    char                    szInFile[80];     // Input file name
-    char                    szOutFile[80];    // Output file name
+    char                    szInFile[255];     // Input file name
+    char                    szOutFile[255];    // Output file name
     int                     iArgIdx;
     unsigned short          usPackedIdx;
     unsigned long           ulBuffSize = 0L;
@@ -380,8 +389,9 @@ int main(int argc, char ** argv)
                 fprintf(stderr, "%8.8ld Messages \r",ulTotal);
 
             // Save data start and stop times
-            if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS) &&
-                (suI106Hdr.ubyDataType != I106CH10_DTYPE_IRIG_TIME))
+            if ((suI106Hdr.ubyDataType != I106CH10_DTYPE_TMATS          ) &&
+                (suI106Hdr.ubyDataType != I106CH10_DTYPE_IRIG_TIME      ) &&
+                (suI106Hdr.ubyDataType != I106CH10_DTYPE_RECORDING_INDEX))
                 {
                 if (bFoundDataStartTime == bFALSE) 
                     {
@@ -428,7 +438,8 @@ int main(int argc, char ** argv)
                     apsuChanInfo[suI106Hdr.uChID]->ulIndex++;
                     break;
 
-                case I106CH10_DTYPE_PCM :               // 0x09
+                case I106CH10_DTYPE_PCM_FMT_0 :         // 0x08
+                case I106CH10_DTYPE_PCM_FMT_1 :         // 0x09
                     apsuChanInfo[suI106Hdr.uChID]->ulPCM++;
                     break;
 
@@ -526,6 +537,10 @@ int main(int argc, char ** argv)
                     break;
 
                 case I106CH10_DTYPE_VIDEO_FMT_0 :       // 0x40
+                case I106CH10_DTYPE_VIDEO_FMT_1 :       // 0x41
+                case I106CH10_DTYPE_VIDEO_FMT_2 :       // 0x42
+                case I106CH10_DTYPE_VIDEO_FMT_3 :       // 0x43
+                case I106CH10_DTYPE_VIDEO_FMT_4 :       // 0x44
                     apsuChanInfo[suI106Hdr.uChID]->ulMPEG2++;
                     break;
 
@@ -533,9 +548,48 @@ int main(int argc, char ** argv)
                     apsuChanInfo[suI106Hdr.uChID]->ulUART++;
                     break;
 
-
                 case I106CH10_DTYPE_ETHERNET_FMT_0 :    // 0x68
                     apsuChanInfo[suI106Hdr.uChID]->ulEthernet++;
+                    break;
+
+                case I106CH10_DTYPE_16PP194 :           // 0x1A
+                    apsuChanInfo[suI106Hdr.uChID]->ul16PP194++;
+                    break;
+
+                case I106CH10_DTYPE_DISCRETE :          // 0x29
+                    apsuChanInfo[suI106Hdr.uChID]->ulDiscrete++;
+                    break;
+
+                case I106CH10_DTYPE_PARALLEL_FMT_0 :    // 0x60
+                    apsuChanInfo[suI106Hdr.uChID]->ulParallel++;
+                    break;
+
+                case I106CH10_DTYPE_MESSAGE :           // 0x30
+                    apsuChanInfo[suI106Hdr.uChID]->ulMessage++;
+                    break;
+
+                case I106CH10_DTYPE_IMAGE_FMT_1 :       // 0x48
+                case I106CH10_DTYPE_IMAGE_FMT_2 :       // 0x49
+                    apsuChanInfo[suI106Hdr.uChID]->ulImage++;
+                    break;
+
+                case I106CH10_DTYPE_TSPI_FMT_0 :        // 0x70
+                case I106CH10_DTYPE_TSPI_FMT_1 :        // 0x71
+                case I106CH10_DTYPE_TSPI_FMT_2 :        // 0x72
+                    apsuChanInfo[suI106Hdr.uChID]->ulTSPI++;
+                    break;
+
+                case I106CH10_DTYPE_CAN :               // 0x78
+                    apsuChanInfo[suI106Hdr.uChID]->ulCAN++;
+                    break;
+
+                case I106CH10_DTYPE_FC_FMT_0 :          // 0x79
+                case I106CH10_DTYPE_FC_FMT_1 :          // 0x7A
+                    apsuChanInfo[suI106Hdr.uChID]->ulFibreChan++;
+                    break;
+
+                case I106CH10_DTYPE_ETHERNET_A664 :     // 0x69
+                    apsuChanInfo[suI106Hdr.uChID]->ulARINC664++;
                     break;
 
                 default:
@@ -593,7 +647,7 @@ int main(int argc, char ** argv)
     strftime(szTime, 50, szTimeFmt, psuTmTime);
     fprintf(psuOutFile,"Data Stop  %s\n\n",  szTime);
 
-    fprintf(psuOutFile,"\nTOTAL RECORDS:    %10lu\n\n", ulTotal);
+    fprintf(psuOutFile,"\nTOTAL PACKETS:    %10lu\n\n", ulTotal);
 
 /*
  *  Free dynamic memory.
@@ -690,16 +744,43 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile)
 
 
     if (psuChanInfo->ulMPEG2 != 0)
-        fprintf(psuOutFile,"    MPEG Video        %10lu\n",   psuChanInfo->ulMPEG2);
+        fprintf(psuOutFile,"    Video             %10lu\n",   psuChanInfo->ulMPEG2);
 
     if (psuChanInfo->ulUART != 0)
         fprintf(psuOutFile,"    UART              %10lu\n",   psuChanInfo->ulUART);
 
-    if (psuChanInfo->ulUserDefined != 0)
-        fprintf(psuOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
-
     if (psuChanInfo->ulEthernet != 0)
         fprintf(psuOutFile,"    Ethernet          %10lu\n",   psuChanInfo->ulEthernet);
+
+    if (psuChanInfo->ul16PP194 != 0)
+        fprintf(psuOutFile,"    16PP194           %10lu\n",   psuChanInfo->ul16PP194);
+
+    if (psuChanInfo->ulDiscrete != 0)
+        fprintf(psuOutFile,"    Discrete          %10lu\n",   psuChanInfo->ulDiscrete);
+
+    if (psuChanInfo->ulParallel != 0)
+        fprintf(psuOutFile,"    Parallel          %10lu\n",   psuChanInfo->ulParallel);
+
+    if (psuChanInfo->ulMessage != 0)
+        fprintf(psuOutFile,"    Message Data      %10lu\n",   psuChanInfo->ulMessage);
+
+    if (psuChanInfo->ulImage != 0)
+        fprintf(psuOutFile,"    Image             %10lu\n",   psuChanInfo->ulImage);
+
+    if (psuChanInfo->ulTSPI != 0)
+        fprintf(psuOutFile,"    TSPI              %10lu\n",   psuChanInfo->ulTSPI);
+
+    if (psuChanInfo->ulCAN != 0)
+        fprintf(psuOutFile,"    CAN Bus           %10lu\n",   psuChanInfo->ulCAN);
+
+    if (psuChanInfo->ulFibreChan != 0)
+        fprintf(psuOutFile,"    Fibre Channel     %10lu\n",   psuChanInfo->ulFibreChan);
+
+    if (psuChanInfo->ulARINC664 != 0)
+        fprintf(psuOutFile,"    ARINC 664         %10lu\n",   psuChanInfo->ulARINC664);
+
+    if (psuChanInfo->ulUserDefined != 0)
+        fprintf(psuOutFile,"    User Defined      %10lu\n",   psuChanInfo->ulUserDefined);
 
     if (psuChanInfo->ulOther != 0)
         fprintf(psuOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
@@ -794,7 +875,6 @@ void vProcessTmats(SuTmatsInfo * psuTmatsInfo, SuChanInfo * apsuChanInfo[])
             // Make sure a message count structure exists
             if (apsuChanInfo[iTrackNumber] == NULL)
                 {
-// SOMEDAY PROBABLY WANT TO HAVE DIFFERENT COUNT STRUCTURES FOR EACH CHANNEL TYPE
                 apsuChanInfo[iTrackNumber] = malloc(sizeof(SuChanInfo));
                 memset(apsuChanInfo[iTrackNumber], 0, sizeof(SuChanInfo));
                 apsuChanInfo[iTrackNumber]->iChanID = iTrackNumber;
