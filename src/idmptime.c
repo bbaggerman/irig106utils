@@ -58,7 +58,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -192,7 +192,7 @@ int main(int argc, char ** argv)
  */
 
     fprintf(stderr, "\nIDMPTIME "MAJOR_VERSION"."MINOR_VERSION"\n");
-    fprintf(stderr, "Freeware Copyright (C) 2010 Irig106.org\n\n");
+    fprintf(stderr, "Freeware Copyright (C) 2019 Irig106.org\n\n");
 
 	putenv("TZ=GMT0");
 	tzset();
@@ -376,8 +376,8 @@ int main(int argc, char ** argv)
                     iMDay  = psuTimeDmy->uTDn *   10 + psuTimeDmy->uDn;
                     iMon   = psuTimeDmy->uTOn *   10 + psuTimeDmy->uOn - 1;
                     iYear  = psuTimeDmy->uOYn * 1000 + psuTimeDmy->uHYn * 100 + 
-                                        psuTimeDmy->uTYn *   10 + psuTimeDmy->uYn - 1900;
-                    fprintf(psuOutFile,"%2.2d/%2.2d/%4.4d %2.2d:%2.2d:%2.2d", iMDay, iMon, iYear, iHour, iMin, iSec);
+                             psuTimeDmy->uTYn *   10 + psuTimeDmy->uYn;
+                    fprintf(psuOutFile,"%2.2d/%2.2d/%4.4d %2.2d:%2.2d:%2.2d", iMon, iMDay, iYear, iHour, iMin, iSec);
                     }
 
                 // Print various status flags
@@ -404,31 +404,31 @@ int main(int argc, char ** argv)
                 switch (psuChanSpecTime->uTimeFmt)
                     {
                     case I106_TIMEFMT_IRIG_B     :
-                        fprintf(psuOutFile," IRIG-B        ");
+                        fprintf(psuOutFile,", IRIG-B        ");
                         break;
                     case I106_TIMEFMT_IRIG_A     :
-                        fprintf(psuOutFile," IRIG-A        ");
+                        fprintf(psuOutFile,", IRIG-A        ");
                         break;
                     case I106_TIMEFMT_IRIG_G     :
-                        fprintf(psuOutFile," IRIG-G        ");
+                        fprintf(psuOutFile,", IRIG-G        ");
                         break;
                     case I106_TIMEFMT_INT_RTC    :
-                        fprintf(psuOutFile," Internal Clock");
+                        fprintf(psuOutFile,", Internal Clock");
                         break;
                     case I106_TIMEFMT_GPS_UTC    :
-                        fprintf(psuOutFile," UTC From GPS  ");
+                        fprintf(psuOutFile,", UTC From GPS  ");
                         break;
                     case I106_TIMEFMT_GPS_NATIVE :
-                        fprintf(psuOutFile," Native GPS    ");
+                        fprintf(psuOutFile,", Native GPS    ");
                         break;
                     default                      :
-                        fprintf(psuOutFile,"Format Unknown");
+                        fprintf(psuOutFile,", Format Unknown");
                         break;
                     } // end switch on Time Format
 
 
-                if (psuChanSpecTime->bLeapYear) fprintf(psuOutFile,"Leap Year");
-                else                            fprintf(psuOutFile,"Not Leap Year");
+                if (psuChanSpecTime->bLeapYear) fprintf(psuOutFile,", Leap Year");
+                else                            fprintf(psuOutFile,", Not Leap Year");
 
                 // Print out the data
                 fprintf(psuOutFile,"\n");
@@ -536,7 +536,7 @@ void vUsage(void)
     {
     printf("\nIDMPTIME "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Dump time records from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2010 Irig106.org\n\n");
+    printf("Freeware Copyright (C) 2019 Irig106.org\n\n");
     printf("Usage: idmptime <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");
