@@ -48,6 +48,7 @@
 #include "irig106ch10.h"
 
 #include "i106_time.h"
+#include "i106_index.h"
 #include "i106_decode_time.h"
 #include "i106_decode_tmats.h"
 
@@ -102,10 +103,16 @@ int main(int argc, char ** argv)
     int                     iArgIdx;
     FILE                  * psuOutFile;        // Output file handle
     int                     iChannel;         // Channel number
-    unsigned long           lMsgs = 0;        // Total message
     unsigned long           lTimeMsgs = 0;    // Total time messages
     int                     bVerbose;
     int                     bPrintTMATS;
+    int                     bFoundIndex;
+    SuPacketIndexInfo     * asuPacketIndex;
+    uint32_t                uCurrIndex;
+    uint32_t                uNumIndexes;
+    int                     bTryIndex;
+    int                     bUseIndex;
+
     unsigned long           ulBuffSize = 0L;
     int64_t                 llRelTime;
  
@@ -141,6 +148,8 @@ int main(int argc, char ** argv)
     iChannel        = -1;
 
     bVerbose        = bFALSE;            /* No verbosity                      */
+    bTryIndex       = bFALSE;
+    bUseIndex       = bFALSE;
     bPrintTMATS     = bFALSE;
 
     szInFile[0]  = '\0';
@@ -161,6 +170,10 @@ int main(int argc, char ** argv)
                     case 'c' :                   /* Channel number */
                         iArgIdx++;
                         sscanf(argv[iArgIdx],"%d",&iChannel);
+                        break;
+
+                    case 'i' :                   /* Try to use index flag */
+                        bTryIndex = bTRUE;
                         break;
 
                     case 'T' :                   /* Print TMATS flag */
@@ -283,16 +296,60 @@ int main(int argc, char ** argv)
         } // end if print TMATS
 
 /*
+ * If index is present then read and process index info
+ */
+
+    bUseIndex = bFALSE;
+    if (bTryIndex == bTRUE)
+        {
+        enStatus = enIndexPresent(m_iI106Handle, &bFoundIndex);
+        if ((enStatus == I106_OK) && (bFoundIndex == bTRUE))
+            {
+            InitIndex(m_iI106Handle);
+            enStatus = enReadIndexes(m_iI106Handle);
+            if (enStatus == I106_OK)
+                {
+                enStatus = enGetIndexArray(m_iI106Handle, &asuPacketIndex, &uNumIndexes);
+                if (enStatus == I106_OK)
+                    {
+                    bUseIndex = bTRUE;
+                    printf("Using Time Index\n\n", lTimeMsgs);
+                    }
+                }
+            } // end if use index
+        }
+
+/*
  * Read messages until error or EOF
  */
 
-    lMsgs = 1;
-
+    uCurrIndex = 0;
     while (1==1) 
         {
 
-        // Read the next header
-        enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
+        if (bUseIndex == bTRUE)
+            {
+            // Walk index array looking for time
+            while (uCurrIndex < uNumIndexes)
+                {
+                if  (asuPacketIndex[uCurrIndex].ubyDataType == I106CH10_DTYPE_IRIG_TIME)
+                    break;
+                else
+                    uCurrIndex++;
+                }
+            if (uCurrIndex < uNumIndexes)
+                {
+                enI106Ch10SetPos(m_iI106Handle, asuPacketIndex[uCurrIndex].lFileOffset);
+                enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
+                uCurrIndex++;
+                }
+            else
+                {
+                enStatus = I106_EOF;
+                }
+            } // end if use index
+        else
+            enStatus = enI106Ch10ReadNextHeader(m_iI106Handle, &suI106Hdr);
 
         // Setup a one time loop to make it easy to break out on error
         do
@@ -446,7 +503,6 @@ int main(int argc, char ** argv)
             break;
             }
 
-        lMsgs++;
         }   // end infinite while
 
 /*
@@ -454,8 +510,6 @@ int main(int argc, char ** argv)
  */
 
     printf("\nTime Message %lu\n", lTimeMsgs);
-    printf("Total Message %lu\n", lMsgs);
-
 
 /*
  *  Close files
@@ -541,7 +595,7 @@ void vUsage(void)
     printf("   <filename> Input/output file names        \n");
     printf("   -v         Verbose                        \n");
     printf("   -c ChNum   Channel Number (default all)   \n");
-    printf("                                             \n");
+    printf("   -i         Use indexes if available       \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");
     printf("Time columns are:                            \n");
