@@ -112,6 +112,7 @@
     <ClInclude Include="..\..\irig106lib\src\i106_decode_1553f1.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_16pp194.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_analog.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_decode_analogf1.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_arinc429.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_can.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_comp_gen_0.h" />
