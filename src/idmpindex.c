@@ -82,8 +82,6 @@ int           m_usMaxBuffSize;
 
 int           m_iI106Handle;
 
-//extern SuCh10Index          m_asuCh10Index[MAX_HANDLES];
-
 /*
  * Function prototypes
  * -------------------
