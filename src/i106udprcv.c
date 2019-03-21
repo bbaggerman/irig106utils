@@ -38,6 +38,8 @@
 
   ==========================================================================*/
 
+#include <fcntl.h>
+#include <io.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,9 +50,11 @@
 #include <sys/stat.h>
 
 // Stuff for _kbhit()
-#if defined(_WIN32)
+#if defined(_MSC_VER)
 #include <conio.h>
+//#include <Windows.h>
 #endif
+
 #if defined(__GNUC__)
 #include <stropts.h>
 #include <termios.h>
@@ -60,17 +64,18 @@
 #endif
 
 // IRIG library
-#include "stdint.h"
+#include "i106_stdint.h"
 #include "config.h"
 #include "irig106ch10.h"
 #include "i106_time.h"
 #include "i106_decode_time.h"
+#include "i106_decode_tmats.h"
 
 // Macros and definitions
 // ----------------------
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "00"
+#define MINOR_VERSION  "01"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -121,8 +126,10 @@ int _kbhit();
 
 int main (int argc, char *argv[])
     {
-    char              * szOutFile = NULL;
-    int                 iI106_In;   // Input data stream handle
+    char              * szOutFile   = NULL;
+	char              * szPcapFile  = NULL;
+    char              * szTmatsFile = NULL;
+	int                 iI106_In;   // Input data stream handle
     int                 iI106_Out;  // Output data file handle
     unsigned int        uPort;      // UDP receive port
 
@@ -133,16 +140,13 @@ int main (int argc, char *argv[])
     unsigned long       ulBuffSize = 0;
     void              * pvBuff     = NULL;
 
-//    void              * pvTimeBuff = NULL;
-//    unsigned long       ulTimeBuffSize = 0;
-
     int                 iArgIdx;
 
     long                lPackets;
-    int                 bHaveTmats = bTRUE;
-    int                 bHaveTime  = bTRUE;
-    int                 bWriteFile = bFALSE;
-
+    int                 bHaveTmats    = bTRUE;
+    int                 bHaveTime     = bTRUE;
+    int                 bWriteFile    = bFALSE;
+	int                 bReadFromPcap = bFALSE;
 
 // Process the command line arguments
 // ----------------------------------
@@ -174,12 +178,23 @@ int main (int argc, char *argv[])
                             }
                         break;
 
-                    case 'T' :                   // Wait for TMATS flag
+                    case 'c' :                   // TMATS file name
+                        iArgIdx++;
+                        szTmatsFile = argv[iArgIdx];
+                        break;
+
+                    case 'T' :                  // Wait for TMATS flag
                         bHaveTmats = bFALSE;
                         break;
 
-                    case 't' :                   // Wait for time flag
+                    case 't' :                  // Wait for time flag
                         bHaveTime = bFALSE;
+                        break;
+
+                    case 'P':                   // Read from pcap file
+                        iArgIdx++;
+                        bReadFromPcap = bTRUE;
+                        szPcapFile = argv[iArgIdx];
                         break;
 
                     default :
@@ -201,19 +216,31 @@ int main (int argc, char *argv[])
 // Opening banner
 
     fprintf(stderr, "\nI106UDPRCV "MAJOR_VERSION"."MINOR_VERSION"\n");
-    fprintf(stderr, "Freeware Copyright (C) 2015 Irig106.org\n\n");
-
-    fprintf(stderr, "Starting, press any key to exit...\n\n");
+    fprintf(stderr, "Freeware Copyright (C) 2019 Irig106.org\n\n");
 
 // Open the input UDPstream and get things setup
 
     // Open the input data stream
-    enStatus = enI106Ch10OpenStreamRead(&iI106_In, uPort);
-    if (enStatus != I106_OK)
+    if (bReadFromPcap == bFALSE)
         {
-        fprintf(stderr, "Error opening network stream : Status = %d\n", enStatus);
-        return 1;
+        enStatus = enI106Ch10OpenStreamRead(&iI106_In, uPort);
+        if (enStatus != I106_OK)
+            {
+            fprintf(stderr, "Error opening network stream : %s\n", szI106ErrorStr(enStatus));
+            return 1;
+            }
+        fprintf(stderr, "Starting, press any key to exit...\n\n");
+        } // end if read ethernet stream
+
+    else
+        {
+        enStatus = enI106Ch10OpenPcapRead(&iI106_In, uPort, szPcapFile);
+        if (enStatus != I106_OK)
+        {
+            fprintf(stderr, "Error opening pcap file : %s\n", szI106ErrorStr(enStatus));
+            return 1;
         }
+    } // end if read pcap
 
 // Open the output file
 
@@ -222,11 +249,101 @@ int main (int argc, char *argv[])
         enStatus = enI106Ch10Open(&iI106_Out, szOutFile, I106_OVERWRITE);
         if (enStatus != I106_OK)
             {
-            fprintf(stderr, "Error opening output data file : Status = %d\n", enStatus);
+            fprintf(stderr, "Error opening output data file : %s\n", szI106ErrorStr(enStatus));
             return 1;
             }
         else
+            {
             bWriteFile = bTRUE;
+
+            // If there is a TMATS file specified then write it to the output file
+            if (szTmatsFile != NULL)
+                {
+#if !defined(_MSC_VER)
+                struct stat     suStatBuff;
+#endif
+                int             hTmatsFile;
+                int             iFileLength;
+                int             iReadLength;
+                
+                // Open the TMATS file
+                hTmatsFile = _open(szTmatsFile, _O_RDONLY|_O_BINARY);
+                if (hTmatsFile == -1)
+                    fprintf(stderr, "Error opening TMATS file\n");
+                else
+                    {
+                    SuTmats_ChanSpec * psuTmatsCsdw;
+                    char             * chTmatsBuff;
+                    SuTmatsInfo        suTmatsInfo;
+
+                    // Get the file length
+#if defined(_MSC_VER)       
+                    iFileLength = _filelength(hTmatsFile);
+#else   
+                    fstat(hTmatsFile, &suStatBuff);
+                    llFileLength = suStatBuff.st_size;
+#endif
+
+                    // Read the TMATS data
+                    pvBuff = malloc(iFileLength+100);   // Extra space to add checksum, etc.
+                    assert(pvBuff != NULL);
+                    ulBuffSize = iFileLength+100;
+
+                    psuTmatsCsdw = (SuTmats_ChanSpec *)pvBuff;
+                    chTmatsBuff  = &(((char *)pvBuff)[4]);
+
+                    // Read the file
+                    iReadLength = _read(hTmatsFile, chTmatsBuff, (unsigned)iFileLength);
+
+                    // Make the IRIG header and data buffer
+                    iHeaderInit(&suI106Hdr, 0, I106CH10_DTYPE_TMATS, I106CH10_PFLAGS_CHKSUM_NONE, 0);
+                    suI106Hdr.ulDataLen = iReadLength+4;
+                    suI106Hdr.ubyHdrVer = 0x01;
+                    suI106Hdr.aubyRefTime[0] = 0;
+                    suI106Hdr.aubyRefTime[1] = 0;
+                    suI106Hdr.aubyRefTime[2] = 0;
+                    suI106Hdr.aubyRefTime[3] = 0;
+                    suI106Hdr.aubyRefTime[4] = 0;
+                    suI106Hdr.aubyRefTime[5] = 0;
+                    uAddDataFillerChecksum(&suI106Hdr, pvBuff);
+                    suI106Hdr.uChecksum = uCalcHeaderChecksum(&suI106Hdr);
+
+                    // Make the TMATS CSDW
+                    memset(psuTmatsCsdw, 0, sizeof(SuTmats_ChanSpec));
+
+                    // Derive a Ch 10 version from the TMATS version field. Not perfect
+                    // but better than nothing.
+                    enI106_Decode_Tmats_Text(chTmatsBuff, iReadLength, &suTmatsInfo);
+                    if (suTmatsInfo.psuFirstGRecord->szIrig106Rev != NULL)
+                        {
+                        int     iTokens;
+                        int     iTmatsVersion;
+
+                        iTokens = sscanf(suTmatsInfo.psuFirstGRecord->szIrig106Rev, "%d", &iTmatsVersion);
+                        if (iTokens == 1)
+                            {
+                            switch (iTmatsVersion)
+                                {
+                                case  7 : psuTmatsCsdw->iCh10Ver = 0x07; break;
+                                case  9 : psuTmatsCsdw->iCh10Ver = 0x08; break;
+                                case 11 : psuTmatsCsdw->iCh10Ver = 0x09; break;
+                                case 13 : psuTmatsCsdw->iCh10Ver = 0x0A; break;
+                                case 15 : psuTmatsCsdw->iCh10Ver = 0x0B; break;
+                                case 17 : psuTmatsCsdw->iCh10Ver = 0x0C; break;
+                                case 19 : psuTmatsCsdw->iCh10Ver = 0x0D; break;
+                                } // end switch on TMATS version
+                            } // end if rev string decoded OK
+                        } // end if TMATS version string found
+                    enI106_Free_TmatsInfo(&suTmatsInfo);
+
+                    // Write it to the output file
+                    enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
+
+                    // Close the TMATS file
+                    _close(hTmatsFile);
+                    } // end if open TMATS file OK
+                } // end if TMATS file specified
+            }
         } // end if output file name not null
 
     if (bWriteFile)
@@ -243,7 +360,8 @@ int main (int argc, char *argv[])
 // ---------------------------
 
     lPackets = 0L;
-    while (!_kbhit())
+    enStatus = I106_OK;
+    while ((!_kbhit()) && (enStatus != I106_EOF))
         {
 
         // Read the next header
@@ -371,10 +489,12 @@ void vUsage(void)
     printf("Receive Ch 10 UDP data stream\n");
     printf("Freeware Copyright (C) 2015 Irig106.org\n\n");
     printf("Usage: i106udprcv <-p port> [-T] [-t] <outfile>\n");
-    printf("  -p port   Receive UDP port number>\n");
-    printf("  -T        Wait for TMATS packet before recording\n");
-    printf("  -t        Wait for time packet before recording\n");
-    printf("  outfile   Output Ch 10 file name\n");
+    printf("  -p port      Receive UDP port number\n");
+    printf("  -c filename  Prepend TMATS config file to output file\n");
+    printf("  -T           Wait for TMATS packet before recording\n");
+    printf("  -t           Wait for time packet before recording\n");
+	printf("  -P filename  Read network data from pcap file\n");
+	printf("  outfile      Output Ch 10 file name\n");
     return;
     }
 
