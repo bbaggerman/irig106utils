@@ -267,7 +267,11 @@ int main (int argc, char *argv[])
                 int             iReadLength;
                 
                 // Open the TMATS file
+#if defined(__GNUC__)
+                hTmatsFile = open(szTmatsFile, O_RDONLY);
+#else
                 hTmatsFile = _open(szTmatsFile, _O_RDONLY|_O_BINARY);
+#endif
                 if (hTmatsFile == -1)
                     fprintf(stderr, "Error opening TMATS file\n");
                 else
@@ -293,7 +297,11 @@ int main (int argc, char *argv[])
                     chTmatsBuff  = &(((char *)pvBuff)[4]);
 
                     // Read the file
+#if defined(__GNUC__)
+                    iReadLength = read(hTmatsFile, chTmatsBuff, (unsigned)iFileLength);
+#else
                     iReadLength = _read(hTmatsFile, chTmatsBuff, (unsigned)iFileLength);
+#endif
 
                     // Make the IRIG header and data buffer
                     iHeaderInit(&suI106Hdr, 0, I106CH10_DTYPE_TMATS, I106CH10_PFLAGS_CHKSUM_NONE, 0);
@@ -341,7 +349,11 @@ int main (int argc, char *argv[])
                     enStatus = enI106Ch10WriteMsg(iI106_Out, &suI106Hdr, pvBuff);
 
                     // Close the TMATS file
+#if defined(__GNUC__)
+                    close(hTmatsFile);
+#else
                     _close(hTmatsFile);
+#endif
                     } // end if open TMATS file OK
                 } // end if TMATS file specified
             }
