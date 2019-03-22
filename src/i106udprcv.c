@@ -313,6 +313,7 @@ int main (int argc, char *argv[])
 
                     // Derive a Ch 10 version from the TMATS version field. Not perfect
                     // but better than nothing.
+                    memset(&suTmatsInfo, 0, sizeof(SuTmatsInfo));
                     enI106_Decode_Tmats_Text(chTmatsBuff, iReadLength, &suTmatsInfo);
                     if (suTmatsInfo.psuFirstGRecord->szIrig106Rev != NULL)
                         {
@@ -488,7 +489,7 @@ void vUsage(void)
     printf("\nI106UDPRCV "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Receive Ch 10 UDP data stream\n");
     printf("Freeware Copyright (C) 2015 Irig106.org\n\n");
-    printf("Usage: i106udprcv <-p port> [-T] [-t] <outfile>\n");
+    printf("Usage: i106udprcv -p port [-c filename] [-T] [-t] [-P filename] [outfile]\n");
     printf("  -p port      Receive UDP port number\n");
     printf("  -c filename  Prepend TMATS config file to output file\n");
     printf("  -T           Wait for TMATS packet before recording\n");
