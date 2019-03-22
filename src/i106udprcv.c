@@ -39,7 +39,6 @@
   ==========================================================================*/
 
 #include <fcntl.h>
-#include <io.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +51,7 @@
 // Stuff for _kbhit()
 #if defined(_MSC_VER)
 #include <conio.h>
+#include <io.h>
 //#include <Windows.h>
 #endif
 
