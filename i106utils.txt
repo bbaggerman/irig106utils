@@ -2,7 +2,7 @@
 IRIG 106 Utilities
 ==================
 
-Copyright (C) 2010 Irig106.org
+Copyright (C) 2019 Irig106.org
 
 Introduction
 ------------
@@ -45,16 +45,35 @@ Usage: i106trim <infile> <outfile> [+hh:mm:ss] [-hh:mm:ss]
 
 Or:    fftrim <infile> to get stats
 
+I106UDPRCV
+----------
 
-IDMPTMATS
----------
+Receiver data from a Ch 10 UDP data stream and show incoming packet
+types. All can write data to a Ch 10 output data file. UDP streams 
+can be either be read live from an Ethernet interface or read from
+a prerecorded PCAP file.
 
-Read and print out the TMATS record in various formats
+Usage: i106udprcv -p port [-c filename] [-T] [-t] [-P filename] [outfile]
+  -p port      Receive UDP port number
+  -c filename  Prepend TMATS config file to output file
+  -T           Wait for TMATS packet before recording
+  -t           Wait for time packet before recording
+  -P filename  Read network data from pcap file
+  outfile      Output Ch 10 file name
 
-Usage: idmptmat <infile> <outfile> <flags>
-  -c      Output channel summary format (default)
-  -t      Output tree view format
-  -r      Output raw TMATS
+
+I106VID
+-------
+
+Extract Video Format 1 packets containing MPEG Transport Stream
+packets and write them to an output file. This output file can 
+then normally be played most video players.
+
+Usage: i106vid <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -T         Print TMATS summary and exit
 
 
 IDMP1553
@@ -75,7 +94,7 @@ Usage: idmp1553 <input file> <output file> [flags]
    -d Num     Dump 1 in 'Num' messages
    -i         Dump data as decimal integers
    -u         Dump status response
-
+   -o         Dump in time order
    -T         Print TMATS summary and exit
 
 The output data fields are:
@@ -89,6 +108,77 @@ Error Bits:
   0x10    Format Error
   0x20    Message Error
   0x80    RT to RT
+
+
+IDMP16PP194
+-----------
+
+Dump 16PP194 records from a Ch 10 data file
+
+Usage: idmp16pp194 <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -T         Print TMATS summary and exit
+
+
+IDMP429
+-------
+
+Dump ARINC 429 records from a Ch 10 data file
+
+Usage: idmpa429 <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -b BusNum  429 Bus Number (default all)
+   -T         Print TMATS summary and exit
+
+The output data fields are:
+Time  ChanID  BusNum  Label  SDI  Data  SSM
+
+
+IDMPCAN
+-------
+
+Dump CAN records from a Ch 10 data file
+
+Usage: idmpcan <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -R         Print Relative Time Counter
+   -T         Print TMATS summary and exit
+
+The output data fields are:
+  Time Chan-Subchan Data...
+
+
+IDMPETH
+-------
+
+Dump Ethernet records from a Ch 10 data file
+
+Usage: idmpeth <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -i         Dump data as decimal integers
+   -T         Print TMATS summary and exit
+
+
+IDMPINDEX
+---------
+
+Dump index data from a Ch 10 data file
+
+Usage: idmpindex <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v               Verbose
+   -t               Print indexed time packets
+   -e               Print indexed event packets
+   -T               Print TMATS summary and exit
+
 
 IDMPINS
 -------
@@ -128,6 +218,7 @@ Usage: idmpins <input file> <output file> [flags]
                       of ground target position
    -T               Print TMATS summary and exit
 
+
 IDMPGPS
 -------
 
@@ -155,6 +246,38 @@ Usage: idmpgps <input file> <output file> [flags]
    -T               Print TMATS summary and exit
 
 
+IDMPTIME
+--------
+
+Read and dump time packets.  This is useful for debugging time problems.
+
+Usage: idmptime <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -T         Print TMATS summary and exit
+
+Time columns are:
+  Channel ID
+  Relative Time Counter Value
+  Time
+  Time Source
+  Time Format
+  Leap Year Flag
+
+
+IDMPTMATS
+---------
+
+Read and print out the TMATS record in various formats
+
+Usage: idmptmat <infile> <outfile> <flags>
+  -c      Output channel summary format (default)
+  -t      Output tree view format
+  -r      Output raw TMATS
+  -s      Output TMATS signature
+
+
 IDMPUART
 --------
 
@@ -180,46 +303,3 @@ Usage: idmpUART <input file> <output file> [flags]
 
 The output data fields are:
   Time Chan-Subchan Data...
-
-
-IDMPTIME
---------
-
-Read and dump time packets.  This is useful for debugging time problems.
-
-Usage: idmptime <input file> <output file> [flags]
-   <filename> Input/output file names
-   -v         Verbose
-   -c ChNum   Channel Number (default all)
-   -T         Print TMATS summary and exit
-
-Time columns are:
-  Channel ID
-  Relative Time Counter Value
-  Time
-  Time Source
-  Time Format
-  Leap Year Flag
-
-
-IDMP429
--------
-
-Read and dump ARINC 429 packets.  Use the "-c" flag to restrict dumps to
-a specific channel number.  Each channel may have multiple 429 buses.  Use
-the "-b" flag to restrict dumps to a specific 429 bus.
-
-Usage: idmpa429 <input file> <output file> [flags]
-   <filename> Input/output file names
-   -v         Verbose
-   -c ChNum   Channel Number (default all)
-   -b BusNum  429 Bus Number (default all)
-   -T         Print TMATS summary and exit
-
-The output data fields are:
-Time  ChanID  BusNum  Label  SDI  Data  SSM
-
-
-IDMPETH
--------
-

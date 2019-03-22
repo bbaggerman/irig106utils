@@ -46,7 +46,7 @@
 #include <assert.h>
 
 #include "config.h"
-#include "stdint.h"
+#include "i106_stdint.h"
 #include "irig106ch10.h"
 
 #include "i106_time.h"
@@ -103,13 +103,13 @@ int main(int argc, char ** argv)
     char                    szInFile[256];      // Input file name
     char                    szOutFile[256];     // Output file name
     int                     iArgIdx;
-    FILE                  * psuOutFile;          // Output file handle
+    FILE                  * psuOutFile;         // Output file handle
 
     int                     iChannel;           // Channel number
     unsigned long           lMsgs = 0;          // Total message
     long                    lCanMsgs = 0;
     int                     bVerbose;
-    int                     iWordIdx;
+    unsigned                uWordIdx;
 
     int                     bPrintTMATS;
     int                     bPrintRTC;
@@ -119,7 +119,7 @@ int main(int argc, char ** argv)
     SuI106Ch10Header        suI106Hdr;
 
     unsigned char         * pvBuff  = NULL;
-    SuCan_CurrMsg        suCanMsg;
+    SuCan_CurrMsg           suCanMsg;
     SuTmatsInfo             suTmatsInfo;
 
 
@@ -354,9 +354,9 @@ int main(int argc, char ** argv)
                     // Print out the data
                     fprintf(psuOutFile," Chan%d-%d ",suI106Hdr.uChID, suCanMsg.psuCanHdr->uSubChannel);
 
-                    for (iWordIdx=0; iWordIdx < suCanMsg.psuCanHdr->uMsgLength; ++iWordIdx) 
+                    for (uWordIdx=0; uWordIdx < suCanMsg.psuCanHdr->uMsgLength; ++uWordIdx) 
                         // Print out as hex characters
-                        fprintf(psuOutFile,"%2.2x ",suCanMsg.pauData[iWordIdx]);
+                        fprintf(psuOutFile,"%2.2x ",suCanMsg.pauData[uWordIdx]);
 
 
                     fprintf(psuOutFile,"\n");

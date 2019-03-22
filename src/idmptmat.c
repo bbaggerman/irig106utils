@@ -43,7 +43,7 @@
 #include <time.h>
 #include <assert.h>
 
-#include "stdint.h"
+#include "i106_stdint.h"
 
 #include "irig106ch10.h"
 #include "i106_decode_tmats.h"
@@ -147,10 +147,12 @@ int main(int argc, char ** argv)
                         bChannelOutput = bTRUE;
                         break;
 
+#if 0
+// SIGNATURE GENERATION ISN'T CORRECT. FIX LATER.
                     case 's' :                   // Signature
                         bSigOutput = bTRUE;
                         break;
-
+#endif
                     default :
                         break;
                     } // end flag switch
@@ -464,6 +466,7 @@ void    vDumpSig(SuI106Ch10Header * psuI106Hdr, void * pvBuff, FILE * psuOutFile
         return;
         }
 
+    // THE FIRST PARAMETER IS WRONG. FIX LATER.
     enStatus = enI106_Tmats_Signature(&((char *)pvBuff)[4], psuI106Hdr->ulDataLen-4, TMATS_SIGVER_DEFAULT, TMATS_SIGFLAG_NONE, &iOpCode, &iSignature);
     if (enStatus != I106_OK) 
         {
@@ -495,7 +498,7 @@ void vUsage(void)
     printf("  -c      Output channel summary format (default)\n");
     printf("  -t      Output tree view format\n");
     printf("  -r      Output raw TMATS\n");
-    printf("  -s      Output TMATS signature\n");
+//  printf("  -s      Output TMATS signature\n");
     return;
     }
 
