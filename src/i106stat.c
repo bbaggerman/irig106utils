@@ -44,7 +44,7 @@
 #include <assert.h>
 
 #include "config.h"
-#include "stdint.h"
+#include "i106_stdint.h"
 #include "irig106ch10.h"
 #include "i106_time.h"
 
@@ -785,7 +785,7 @@ void vPrintCounts(SuChanInfo * psuChanInfo, FILE * psuOutFile)
     if (psuChanInfo->ulOther != 0)
         fprintf(psuOutFile,"    Other messages    %10lu\n",   psuChanInfo->ulOther);
 
-    fprintf(psuOutFile,"\n",   psuChanInfo->ulOther);
+    fprintf(psuOutFile,"\n");
     return;
     }
 

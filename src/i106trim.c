@@ -45,7 +45,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "stdint.h"
+#include "i106_stdint.h"
 
 #include "irig106ch10.h"
 #include "i106_time.h"
@@ -86,7 +86,6 @@ unsigned long   m_ulBuffSize = 0L;
 // void vStats(char *szFileName);
 int64_t GetCh10FileSize(char * szFilename);
 void    vUsage(void);
-time_t  mkgmtime(struct tm * tm);
 
 
 

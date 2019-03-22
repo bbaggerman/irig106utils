@@ -44,7 +44,7 @@
 #include <assert.h>
 
 #include "config.h"
-#include "stdint.h"
+#include "i106_stdint.h"
 #include "irig106ch10.h"
 
 #include "i106_time.h"
@@ -313,7 +313,7 @@ int main(int argc, char ** argv)
                 if (enStatus == I106_OK)
                     {
                     bUseIndex = bTRUE;
-                    printf("Using Time Index\n\n", lTimeMsgs);
+                    printf("Using Time Index\n\n");
                     }
                 }
             } // end if use index
