@@ -285,7 +285,7 @@ int main (int argc, char *argv[])
                     iFileLength = _filelength(hTmatsFile);
 #else   
                     fstat(hTmatsFile, &suStatBuff);
-                    llFileLength = suStatBuff.st_size;
+                    iFileLength = suStatBuff.st_size;
 #endif
 
                     // Read the TMATS data
