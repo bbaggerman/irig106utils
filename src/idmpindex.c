@@ -58,7 +58,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -200,7 +200,7 @@ int main(int argc, char ** argv)
  */
 
     fprintf(stderr, "\nIDMPINDEX "MAJOR_VERSION"."MINOR_VERSION"\n");
-    fprintf(stderr, "Freeware Copyright (C) 2013 Irig106.org\n\n");
+    fprintf(stderr, "Freeware Copyright (C) 2019 Irig106.org\n\n");
 
 	putenv("TZ=GMT0");
 	tzset();
@@ -398,7 +398,7 @@ int main(int argc, char ** argv)
 
                 // Read the index packet
                 // Make sure our buffer is big enough, size *does* matter
-                if (ulRootBuffSize < suI106Hdr.ulPacketLen)
+                if (ulNodeBuffSize < suI106Hdr.ulPacketLen)
                     {
                     pvNodeBuff = realloc(pvNodeBuff, suI106Hdr.ulPacketLen);
                     ulNodeBuffSize = suI106Hdr.ulPacketLen;
@@ -680,7 +680,7 @@ void vUsage(void)
     {
     printf("\nIDMPINDEX "MAJOR_VERSION"."MINOR_VERSION" "__DATE__" "__TIME__"\n");
     printf("Dump index data from a Ch 10 data file\n");
-    printf("Freeware Copyright (C) 2013 Irig106.org\n\n");
+    printf("Freeware Copyright (C) 2019 Irig106.org\n\n");
     printf("Usage: idmpindex <input file> <output file> [flags]\n");
     printf("   <filename> Input/output file names        \n");
     printf("   -v               Verbose                                  \n");
