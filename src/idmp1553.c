@@ -446,6 +446,7 @@ int main(int argc, char ** argv)
 
                             // PROBABLY REALLY OUGHT TO CHECK FOR THAT GOOFY SECONDARY
                             // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
+                            // Maybe for 1553 messages periodicity checking ?
                             enI106_Rel2IrigTime(m_iI106Handle,
                                 su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
                             szTime = ctime((time_t *)&suTime.ulSecs);
@@ -454,7 +455,7 @@ int main(int argc, char ** argv)
                            
 
                             if (bCSV) {
-                                fprintf(psuOutFile, "%ld.%6.6d", suTime.ulSecs, iMicroSec);
+                                fprintf(psuOutFile, "%ld.%6.6d", suTime.ulSecs, iMicroSec); //Print time_t in raw format
                             }
                             else {
                                 fprintf(psuOutFile, "%s.%6.6d", &szTime[11], iMicroSec);
