@@ -246,6 +246,7 @@
     <ClCompile Include="..\..\irig106lib\src\i106_data_stream.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_time.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats.c" />
+    <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_b.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_g.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_p.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_r.c" />
@@ -271,6 +272,7 @@
     <ClInclude Include="..\..\irig106lib\src\i106_data_stream.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_time.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_b.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_common.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_g.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_p.h" />
