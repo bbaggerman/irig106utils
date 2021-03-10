@@ -97,6 +97,8 @@ typedef struct {
 
 
 // F-16/C-130/A-10 EGI
+// Synthetic Nav Data Format 1 uses the same layout but some of the
+// fields are interpreted slightly differently.
 
 typedef struct INS_DataS {
   unsigned short   uStatus;            /*  1 */
@@ -121,7 +123,7 @@ typedef struct INS_DataS {
            short   sCXX_MSW;           /* 17 */
   unsigned short   uCXX_LSW;           /* 18 */
            short   sCXY_MSW;           /* 19 */
-  unsigned short   uCXY_LSW;           /* 20 */
+  unsigned short   uCXY_LSW;           /* 20, Synthetic data encoded Latitude here */
            short   sCXZ_MSW;           /* 21 */
   unsigned short   uCXZ_LSW;           /* 22 */
            short   sLon_MSW;           /* 23 */
@@ -376,7 +378,7 @@ int main (int argc, char *argv[])
                     case 'i' :                   /* INS type */
                         iArgIdx++;
                         sscanf(argv[iArgIdx],"%d",&uINSType);
-                        if (uINSType>2) 
+                        if (uINSType > 3) 
                             {
                             printf("Invalid INS type\n");
                             vUsage();
@@ -677,8 +679,8 @@ int main (int argc, char *argv[])
                         // Decode INS data
                         // ---------------
 
-                        // F-16/C-130/A-10 EGI
-                        if (uINSType == 1) 
+                        // F-16/C-130/A-10 EGI, Synthetic Nav Format 1
+                        if ((uINSType == 1) || (uINSType == 3))
                             {
 
                             // If decimation counter down to 1 then  calculate
@@ -688,11 +690,24 @@ int main (int argc, char *argv[])
                                 psuINS01 = (SuINS_Data *)(su1553Msg.pauData);
 
                                 // Convert INS Lat and Lon to degrees if it is to be used
-                                suAC.suPos.dLat  = (180.0/M_PI)*asin((float)((long)(psuINS01->sCXZ_MSW)<<16 | (long)(psuINS01->uCXZ_LSW))/(float)0x40000000);
-                                suAC.suPos.dLon  = (180.0     )*    ((float)((long)(psuINS01->sLon_MSW)<<16 | (long)(psuINS01->uLon_LSW))/(float)0x7fffffff);
-                                suAC.bValid      = (psuINS01->uStatus & 0xf800) == 0;
+                                // F-16/C-130/A-10 EGI
+                                if (uINSType != 3)
+                                    {
+                                    suAC.suPos.dLat    = (180.0/M_PI)*asin((float)((long)(psuINS01->sCXZ_MSW)<<16 | (long)(psuINS01->uCXZ_LSW))/(float)0x40000000);
+                                    suAC.suPos.dLon    = (180.0     )*    ((float)((long)(psuINS01->sLon_MSW)<<16 | (long)(psuINS01->uLon_LSW))/(float)0x7fffffff);
+                                    suAC.bValid        = (psuINS01->uStatus & 0xf800) == 0;
+                                    suAC.bHaveAttitude = bTRUE;
+                                    }
+                                // Synthetic Nav Format 1
+                                else
+                                    {
+                                    suAC.suPos.dLat    = (180.0     )*    ((float)((long)(psuINS01->sCXZ_MSW)<<16 | (long)(psuINS01->uCXZ_LSW))/(float)0x7fffffff);
+                                    suAC.suPos.dLon    = (180.0     )*    ((float)((long)(psuINS01->sLon_MSW)<<16 | (long)(psuINS01->uLon_LSW))/(float)0x7fffffff);
+                                    suAC.bValid        = (psuINS01->uStatus & 0x0040) == 0x0040;
+                                    suAC.bHaveAttitude = (psuINS01->uStatus & 0x0065) == 0x0065;
+                                    }
 
-                                if (bDumpAttitude) 
+                                if ((bDumpAttitude) && (suAC.bHaveAttitude))
                                     {
                                     suAC.suPos.fRoll     = 180.0f * psuINS01->sRoll        / (float)0x7fff;
                                     suAC.suPos.fPitch    = 180.0f * psuINS01->sPitch       / (float)0x7fff;
@@ -703,7 +718,6 @@ int main (int argc, char *argv[])
                                                                 (float)psuINS01->sAccZ*(float)psuINS01->sAccZ) / 32.0f;
                                     suAC.fSpeed          = sqrt((float)psuINS01->sVelX_MSW*(float)psuINS01->sVelX_MSW +
                                                                 (float)psuINS01->sVelY_MSW*(float)psuINS01->sVelY_MSW) * 3600.0f / (4.0f * 6080.0f);
-                                    suAC.bHaveAttitude   = bTRUE;
                                     } // end dump attitude
 
                                 uDecCnt = uDecimation;
@@ -956,6 +970,7 @@ void vUsage(void)
     printf("   -i Type          INS Type (default 1)                     \n");
     printf("                      1 = F-16/C-130/A-10 EGI                \n");
     printf("                      2 = F-15                               \n");
+    printf("                      3 = Synthetic Nav Format 1             \n");
     printf("   -g Lat Lon Elev  Ground target position (ft)              \n");
     printf("   -m Dist          Only dump within this many nautical miles\n");
     printf("                      of ground target position              \n");
