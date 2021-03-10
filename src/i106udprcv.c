@@ -97,7 +97,7 @@ unsigned long   m_ulBuffSize = 0L;
 char * aszPacketType[] = {
     "User Defined", "TMATS",        "Event",        "Index",        "Computer 4",   "Computer 5",   "Computer 6",   "Computer 7",
     "PCM Fmt 0",    "PCM Fmt 1",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
-    "UNDEFINED",    "Time",         "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
+    "UNDEFINED",    "Time",         "Network Time", "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
     "UNDEFINED",    "1553 Fmt 1",   "16PP194",      "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
     "UNDEFINED",    "Analog",       "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
     "UNDEFINED",    "Discrete",     "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",    "UNDEFINED",
@@ -407,8 +407,11 @@ int main (int argc, char *argv[])
                 break;
                 }
 
+uint16_t uHdrChksum  = uCalcHeaderChecksum(&suI106Hdr);
+uint16_t uSHdrChksum = uCalcSecHeaderChecksum(&suI106Hdr);
+
             // Print some general information
-            printf("Ch %2d %-20s (0x%2.2d)", suI106Hdr.uChID, 
+            printf("Ch %2d %-20s (0x%2.2x)", suI106Hdr.uChID, 
                 aszPacketType[suI106Hdr.ubyDataType], suI106Hdr.ubyDataType);
 
             // Decode some selected message types
@@ -431,6 +434,19 @@ int main (int argc, char *argv[])
                         printf("\nGot first Time packet\n");
                         }
                     enI106_Decode_TimeF1(&suI106Hdr, pvBuff, &suTime);
+                    enI106_SetRelTime(iI106_In, &suTime, suI106Hdr.aubyRefTime);
+
+                    printf(" %s", IrigTime2String(&suTime));
+                    break;
+
+                case I106CH10_DTYPE_NETWORK_TIME :
+                    // Decode time
+                    if (bHaveTime == bFALSE)
+                        {
+                        bHaveTime = bTRUE;
+                        printf("\nGot first Time packet\n");
+                        }
+                    enI106_Decode_TimeF2(&suI106Hdr, pvBuff, &suTime); 
                     enI106_SetRelTime(iI106_In, &suTime, suI106Hdr.aubyRefTime);
 
                     printf(" %s", IrigTime2String(&suTime));

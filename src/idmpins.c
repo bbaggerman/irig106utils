@@ -107,7 +107,7 @@ typedef struct INS_DataS {
   unsigned short   uVelX_LSW;          /*  4 */
            short   sVelY_MSW;          /*  5 */
   unsigned short   uVelY_LSW;          /*  6 */
-           short   uVelZ_MSW;          /*  7 */
+           short   sVelZ_MSW;          /*  7 */
   unsigned short   uVelZ_LSW;          /*  8 */
   unsigned short   uAz;                /*  9 */
            short   sRoll;              /* 10 */

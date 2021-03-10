@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "02"
+#define MINOR_VERSION  "03"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -120,6 +120,7 @@ int main(int argc, char ** argv)
     int                     bStatusResponse;
     int                     bPrintTMATS;
     int                     bInOrder;         // Dump out in order
+    int                     bCSV;
     unsigned long           ulBuffSize = 0L;
     unsigned int            uErrorFlags;
 
@@ -153,6 +154,8 @@ int main(int argc, char ** argv)
     bStatusResponse = bFALSE;
     bPrintTMATS     = bFALSE;
     bInOrder        = bFALSE;
+    bDecimal        = bFALSE;
+    bCSV            = bFALSE;
 
     szInFile[0]  = '\0';
     strcpy(szOutFile,"");                     // Default is stdout
@@ -222,6 +225,10 @@ int main(int argc, char ** argv)
           case 'T' :                   /* Print TMATS flag */
             bPrintTMATS = bTRUE;
             break;
+
+          case 'S':                   /* Output CSV format with semicolon */
+              bCSV = bTRUE;
+              break;
 
           default :
             break;
@@ -439,21 +446,43 @@ int main(int argc, char ** argv)
 
                             // PROBABLY REALLY OUGHT TO CHECK FOR THAT GOOFY SECONDARY
                             // HEADER FORMAT TIME REPRESENTATION. DOES ANYONE USE THAT???
+                            // Maybe for 1553 messages periodicity checking ?
                             enI106_Rel2IrigTime(m_iI106Handle,
                                 su1553Msg.psu1553Hdr->aubyIntPktTime, &suTime);
                             szTime = ctime((time_t *)&suTime.ulSecs);
 							szTime[19] = '\0';
 							iMicroSec = (int)(suTime.ulFrac / 10.0);
-                            fprintf(psuOutFile,"%s.%6.6d", &szTime[11], iMicroSec);
+                           
+
+                            if (bCSV) {
+                                fprintf(psuOutFile, "%ld.%6.6d", suTime.ulSecs, iMicroSec); //Print time_t in raw format
+                            }
+                            else {
+                                fprintf(psuOutFile, "%s.%6.6d", &szTime[11], iMicroSec);
+                            }
+
 
                             // Print out the command word
-                            fprintf(psuOutFile," Ch %d-%c %2.2d %c %2.2d %2.2d",
-                              suI106Hdr.uChID,
-                              su1553Msg.psu1553Hdr->iBusID ? 'B' : 'A',
-                              su1553Msg.psuCmdWord1->suStruct.uRTAddr,
-                              su1553Msg.psuCmdWord1->suStruct.bTR ? 'T' : 'R',
-                              su1553Msg.psuCmdWord1->suStruct.uSubAddr,
-                              su1553Msg.psuCmdWord1->suStruct.uWordCnt);
+                            if (bCSV) {
+                                // Print out the command word
+                                fprintf(psuOutFile, ";Ch;%d-%c;%2.2d;%c;%2.2d;%2.2d",
+                                    suI106Hdr.uChID,
+                                    su1553Msg.psu1553Hdr->iBusID ? 'B' : 'A',
+                                    su1553Msg.psuCmdWord1->suStruct.uRTAddr,
+                                    su1553Msg.psuCmdWord1->suStruct.bTR ? 'T' : 'R',
+                                    su1553Msg.psuCmdWord1->suStruct.uSubAddr,
+                                    su1553Msg.psuCmdWord1->suStruct.uWordCnt);
+                            }
+                            else {
+                                // Print out the command word
+                                fprintf(psuOutFile, " Ch %d-%c %2.2d %c %2.2d %2.2d",
+                                    suI106Hdr.uChID,
+                                    su1553Msg.psu1553Hdr->iBusID ? 'B' : 'A',
+                                    su1553Msg.psuCmdWord1->suStruct.uRTAddr,
+                                    su1553Msg.psuCmdWord1->suStruct.bTR ? 'T' : 'R',
+                                    su1553Msg.psuCmdWord1->suStruct.uSubAddr,
+                                    su1553Msg.psuCmdWord1->suStruct.uWordCnt);
+                            }
 
                             // Print out the error flags
                             uErrorFlags = 
@@ -464,27 +493,64 @@ int main(int argc, char ** argv)
                                 su1553Msg.psu1553Hdr->bFormatError  << 4  |
                                 su1553Msg.psu1553Hdr->bMsgError     << 5  |
                                 su1553Msg.psu1553Hdr->bRT2RT        << 7;
-                            if (bDecimal)
-                              fprintf(psuOutFile," %2d", uErrorFlags);
-                            else
-                              fprintf(psuOutFile," %2.2x", uErrorFlags);
+                            
+                            if (bCSV) {
+                                if (bDecimal)
+                                    fprintf(psuOutFile, ";%2d", uErrorFlags);
+                                else
+                                    fprintf(psuOutFile, ";%2.2x", uErrorFlags);
+                            }
+                            else {
+                                if (bDecimal)
+                                    fprintf(psuOutFile, " %2d", uErrorFlags);
+                                else
+                                    fprintf(psuOutFile, " %2.2x", uErrorFlags);
+                            }
+                            
+                            
+                            if (bCSV) {
+                                // Print out the status response
+                                if (bStatusResponse == bTRUE)
+                                    if (bDecimal)
+                                        fprintf(psuOutFile, ";%4d", *su1553Msg.puStatWord1);
+                                    else
+                                        fprintf(psuOutFile, ";%4.4x", *su1553Msg.puStatWord1);
 
-                            // Print out the status response
-                            if (bStatusResponse == bTRUE)
-                              if (bDecimal)
-                                fprintf(psuOutFile," %4d",*su1553Msg.puStatWord1);
-                              else
-                                fprintf(psuOutFile," %4.4x",*su1553Msg.puStatWord1);
+                                // Print out the data
+    //                            iWordCnt = i1553WordCnt(ptCmdWord1->tStruct);
+                                for (iWordIdx = 0; iWordIdx < su1553Msg.uWordCnt; iWordIdx++) {
+                                    if (bDecimal)
+                                        fprintf(psuOutFile, ";%5.5u", su1553Msg.pauData[iWordIdx]);
+                                    else
+                                        fprintf(psuOutFile, ";%4.4x", su1553Msg.pauData[iWordIdx]);
+                                }
 
-                            // Print out the data
-//                            iWordCnt = i1553WordCnt(ptCmdWord1->tStruct);
-                            for (iWordIdx=0; iWordIdx<su1553Msg.uWordCnt; iWordIdx++) {
-                              if (bDecimal)
-                                fprintf(psuOutFile," %5.5u",su1553Msg.pauData[iWordIdx]);
-                              else
-                                fprintf(psuOutFile," %4.4x",su1553Msg.pauData[iWordIdx]);
-                              }
+                                int Idxcmpl = 0;
+                                if (su1553Msg.uWordCnt < 32) {
+                                    for (Idxcmpl = 0; Idxcmpl < (32 - su1553Msg.uWordCnt); Idxcmpl++) {
+                                        fprintf(psuOutFile, ";");
+                                    }
+                                }
+                            }
+                            else {
+                                // Print out the status response
+                                if (bStatusResponse == bTRUE)
+                                    if (bDecimal)
+                                        fprintf(psuOutFile, " %4d", *su1553Msg.puStatWord1);
+                                    else
+                                        fprintf(psuOutFile, " %4.4x", *su1553Msg.puStatWord1);
 
+                                // Print out the data
+    //                            iWordCnt = i1553WordCnt(ptCmdWord1->tStruct);
+                                for (iWordIdx = 0; iWordIdx < su1553Msg.uWordCnt; iWordIdx++) {
+                                    if (bDecimal)
+                                        fprintf(psuOutFile, " %5.5u", su1553Msg.pauData[iWordIdx]);
+                                    else
+                                        fprintf(psuOutFile, " %4.4x", su1553Msg.pauData[iWordIdx]);
+                                }
+                            }
+                            
+                                
                             fprintf(psuOutFile,"\n");
                             fflush(psuOutFile);
 
@@ -619,6 +685,7 @@ void vUsage(void)
     printf("   -i         Dump data as decimal integers  \n");
     printf("   -u         Dump status response           \n");
     printf("   -o         Dump in time order             \n");
+    printf("   -S         Dump in CSV (fixed 32 DW column num.)        \n");
     printf("                                             \n");
     printf("   -T         Print TMATS summary and exit   \n");
     printf("                                             \n");

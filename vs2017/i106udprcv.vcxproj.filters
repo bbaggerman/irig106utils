@@ -10,6 +10,7 @@
     <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_r.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_time.c" />
     <ClCompile Include="..\..\irig106lib\src\i106_decode_time.c" />
+    <ClCompile Include="..\..\irig106lib\src\i106_decode_tmats_b.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\irig106lib\src\config.h" />
@@ -22,5 +23,6 @@
     <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_common.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_time.h" />
     <ClInclude Include="..\..\irig106lib\src\i106_decode_time.h" />
+    <ClInclude Include="..\..\irig106lib\src\i106_decode_tmats_b.h" />
   </ItemGroup>
 </Project>
