@@ -59,7 +59,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "01"
+#define MINOR_VERSION  "02"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -431,7 +431,7 @@ int main(int argc, char ** argv)
                     iHour  = psuTimeDmy->uTHn *   10 + psuTimeDmy->uHn;
 
                     iMDay  = psuTimeDmy->uTDn *   10 + psuTimeDmy->uDn;
-                    iMon   = psuTimeDmy->uTOn *   10 + psuTimeDmy->uOn - 1;
+                    iMon   = psuTimeDmy->uTOn *   10 + psuTimeDmy->uOn;
                     iYear  = psuTimeDmy->uOYn * 1000 + psuTimeDmy->uHYn * 100 + 
                              psuTimeDmy->uTYn *   10 + psuTimeDmy->uYn;
                     fprintf(psuOutFile,"%2.2d/%2.2d/%4.4d %2.2d:%2.2d:%2.2d", iMon, iMDay, iYear, iHour, iMin, iSec);
