@@ -60,7 +60,7 @@
  */
 
 #define MAJOR_VERSION  "01"
-#define MINOR_VERSION  "02"
+#define MINOR_VERSION  "03"
 
 #if !defined(bTRUE)
 #define bTRUE   (1==1)
@@ -707,18 +707,31 @@ int main (int argc, char *argv[])
                                     suAC.bHaveAttitude = (psuINS01->uStatus & 0x0065) == 0x0065;
                                     }
 
-                                if ((bDumpAttitude) && (suAC.bHaveAttitude))
-                                    {
-                                    suAC.suPos.fRoll     = 180.0f * psuINS01->sRoll        / (float)0x7fff;
-                                    suAC.suPos.fPitch    = 180.0f * psuINS01->sPitch       / (float)0x7fff;
-                                    suAC.suPos.fHeading  = 180.0f * psuINS01->uTrueHeading / (float)0x7fff;
-                                    suAC.suPos.fAltitude = psuINS01->sAlt * 4.0f;
-                                    suAC.fAccel          = sqrt((float)psuINS01->sAccX*(float)psuINS01->sAccX +
-                                                                (float)psuINS01->sAccY*(float)psuINS01->sAccY +
-                                                                (float)psuINS01->sAccZ*(float)psuINS01->sAccZ) / 32.0f;
-                                    suAC.fSpeed          = sqrt((float)psuINS01->sVelX_MSW*(float)psuINS01->sVelX_MSW +
-                                                                (float)psuINS01->sVelY_MSW*(float)psuINS01->sVelY_MSW) * 3600.0f / (4.0f * 6080.0f);
-                                    } // end dump attitude
+                                // See if attitude is to be calculated
+                                if (bDumpAttitude)
+                                    // If we have attitude info then calculate it
+                                    if (suAC.bHaveAttitude)
+                                        {
+                                        suAC.suPos.fRoll     = 180.0f * psuINS01->sRoll        / (float)0x7fff;
+                                        suAC.suPos.fPitch    = 180.0f * psuINS01->sPitch       / (float)0x7fff;
+                                        suAC.suPos.fHeading  = 180.0f * psuINS01->uTrueHeading / (float)0x7fff;
+                                        suAC.suPos.fAltitude = psuINS01->sAlt * 4.0f;
+                                        suAC.fAccel          = sqrt((float)psuINS01->sAccX*(float)psuINS01->sAccX +
+                                                                    (float)psuINS01->sAccY*(float)psuINS01->sAccY +
+                                                                    (float)psuINS01->sAccZ*(float)psuINS01->sAccZ) / 32.0f;
+                                        suAC.fSpeed          = sqrt((float)psuINS01->sVelX_MSW*(float)psuINS01->sVelX_MSW +
+                                                                    (float)psuINS01->sVelY_MSW*(float)psuINS01->sVelY_MSW) * 3600.0f / (4.0f * 6080.0f);
+                                        } // end if attitude info
+                                    // No attitude info (why are we here?) so just fill in zeros
+                                    else
+                                        {
+                                        suAC.suPos.fRoll     = 0.0;
+                                        suAC.suPos.fPitch    = 0.0;
+                                        suAC.suPos.fHeading  = 0.0;
+                                        suAC.suPos.fAltitude = 0.0;
+                                        suAC.fAccel          = 0.0;
+                                        suAC.fSpeed          = 0.0;
+                                        } // end if no attitude info
 
                                 uDecCnt = uDecimation;
                                 bGotINS = bTRUE;
@@ -828,7 +841,7 @@ int main (int argc, char *argv[])
                                 fprintf(psuOutFile,"%s.%3.3d", &szTime[11], iMilliSec);
                                 fprintf(psuOutFile," %11.6f %10.6f   %u ", suAC.suPos.dLon,suAC.suPos.dLat,suAC.bValid);
 
-                                if (suAC.bHaveAttitude) 
+                                if (bDumpAttitude) 
                                     {
                                     fprintf(psuOutFile," %7.0f     %5.1f  %8.3f   %7.3f   %6.3f  %5.1f ",
                                         suAC.suPos.fAltitude,suAC.suPos.fHeading,suAC.suPos.fRoll,suAC.suPos.fPitch,suAC.fAccel,suAC.fSpeed);
