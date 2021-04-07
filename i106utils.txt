@@ -303,3 +303,25 @@ Usage: idmpUART <input file> <output file> [flags]
 
 The output data fields are:
   Time Chan-Subchan Data...
+
+
+
+IDMPMSG
+-------
+
+Dump Messages records from a Ch 10 data file
+
+Usage: idmpmsg <input file> <output file> [flags]
+   <filename> Input/output file names
+   -v         Verbose
+   -c ChNum   Channel Number (default all)
+   -s SC      SubChannel (default all)
+   -d Num     Dump 1 in 'Num' messages
+   -i         Dump data as decimal integers
+   -o         Dump in time order
+   -S         Dump in CSV (fixed 32 DW column num.)
+
+   -T         Print TMATS summary and exit
+
+The output data fields are:
+  Raw_Time Time Type SubChannel DataError FormatError Data
