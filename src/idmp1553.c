@@ -693,11 +693,12 @@ void vUsage(void)
     printf("  Time Bus RT T/R SA WC Errs Data...         \n");
     printf("                                             \n");
     printf("Error Bits:                                  \n");
-    printf("  0x01    Word Error                         \n");
+    printf("  0x01    Word Error (Machester|Sync encoding\n");
+    printf("                          |bad bitcnt|parity)\n");
     printf("  0x02    Sync Error                         \n");
     printf("  0x04    Word Count Error                   \n");
     printf("  0x08    Response Timeout                   \n");
-    printf("  0x10    Format Error                       \n");
+    printf("  0x10    Format Error (illegal gap)         \n");
     printf("  0x20    Message Error                      \n");
     printf("  0x80    RT to RT                           \n");
     }
